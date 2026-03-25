@@ -45,6 +45,50 @@ Un superviseur IA pourra plus tard enrichir le socle pour :
 
 Cette brique n’est pas implémentée dans le premier jet afin de conserver un socle robuste et minimal.
 
+## Extension future : superviseur IA de delivery
+
+L’évolution naturelle de `repo-ops` est d’ajouter un superviseur IA capable de piloter des tâches de développement incrémentales sur plusieurs dépôts, tout en restant compatible avec les contraintes réelles de chaque projet.
+
+Principes d’intégration visés :
+
+- lecture des instructions locales de type `AGENTS.md` dans chaque dépôt ciblé ;
+- découpage du travail en tâches courtes, auditées et rejouables ;
+- exécution bornée par étape, avec validation explicite avant progression ;
+- production systématique d’une synthèse lisible pour l’humain ;
+- absence d’action directe non réversible sur les dépôts tiers sans validation explicite.
+
+Le superviseur IA devra s’insérer dans le socle existant comme une couche d’orchestration complémentaire, et non comme un remplacement de `Renovate`, `n8n` ou des validations CI existantes.
+
+Responsabilités futures attendues :
+
+- sélectionner un dépôt et un objectif de travail ;
+- formuler un plan d’exécution à granularité contrôlée ;
+- déléguer l’implémentation à des agents spécialisés ;
+- déclencher ou vérifier les validations locales et CI ;
+- consolider un état de sortie exploitable pour revue ou ouverture de PR.
+
+Limites de sécurité à préserver :
+
+- ne pas contourner les politiques décrites dans les `AGENTS.md` des dépôts cibles ;
+- ne pas inventer de secrets, de credentials ou d’états externes ;
+- ne pas pousser automatiquement vers un dépôt tiers sans politique explicite ;
+- ne pas fusionner automatiquement une PR sans garde-fous clairement définis.
+
+Structure cible, à préparer plus tard mais sans l’implémenter maintenant :
+
+```text
+repo-ops/
+  docs/
+    ai-supervisor-design.md
+  templates/
+    agent-task-template.md
+  supervisor/
+    planners/
+    tasks/
+    reports/
+    policies/
+```
+
 ## Diagramme
 
 ```mermaid
@@ -60,4 +104,8 @@ flowchart LR
     CI --> Collect
     Templates["Templates email HTML/TXT"] -. évolution future .-> Summary
     Collect -. extension future .-> AI["Superviseur IA"]
+    AI --> Planner["Planification par tâches"]
+    Planner --> Worker["Implémentation incrémentale"]
+    Worker --> Checks["Validations automatiques"]
+    Checks --> Reporter["Synthèse et préparation de PR"]
 ```

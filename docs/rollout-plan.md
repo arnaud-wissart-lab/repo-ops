@@ -54,23 +54,26 @@ Structurer le reporting quotidien et rendre le suivi plus lisible pour la prise 
 
 ### Objectif
 
-Ajouter une couche d’aide à la décision sans remettre en cause le socle d’exécution existant.
+Ajouter une couche de supervision IA capable de piloter des tâches de delivery multi-repo sans remettre en cause le socle d’exécution existant.
 
 ### Livrables
 
-- règles de priorisation multi-repo ;
-- interprétation assistée des échecs de CI ;
-- recommandations d’actions ou de relance ;
-- journalisation des décisions proposées.
+- conception documentée du superviseur IA ;
+- séparation explicite des rôles `planner`, `implementer`, `reviewer`, `QA` et `reporter` ;
+- gabarits de tâches standardisés ;
+- critères d’arrêt, de validation et de synthèse ;
+- première structure cible d’organisation interne pour les futures tâches et rapports.
 
 ### Risques
 
 - surcouche trop complexe trop tôt ;
 - décisions peu explicables ;
-- dépendance fonctionnelle excessive à des signaux imparfaits.
+- dépendance fonctionnelle excessive à des signaux imparfaits ;
+- confusion entre dépôt d’orchestration et dépôts applicatifs pilotés.
 
 ### Critères de validation
 
-- les recommandations restent traçables et compréhensibles ;
-- le superviseur n’exécute rien directement sur les dépôts ;
-- la valeur ajoutée est mesurable sur les dépôts déjà industrialisés.
+- l’architecture cible du superviseur est documentée et actionnable ;
+- la séparation des rôles et des critères d’arrêt est explicite ;
+- le superviseur reste borné par les instructions locales des dépôts cibles ;
+- aucune automatisation non maîtrisée n’est introduite avant la phase d’implémentation réelle.

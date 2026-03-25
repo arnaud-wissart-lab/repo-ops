@@ -81,13 +81,28 @@ Le dossier `scripts/` reste présent pour la transition, mais il ne fait plus pa
    - [`worker-summary.json`](./reports/worker-summary.json)
    - [`worker-summary.txt`](./reports/worker-summary.txt)
    - [`worker-summary.html`](./reports/worker-summary.html)
+   - [`renovate-execution.json`](./reports/renovate-execution.json) lorsqu'une exécution explicite de `Renovate` est lancée via le worker
    Le worker interroge GitHub avec `GITHUB_TOKEN` pour récupérer les PR Renovate ouvertes, les PR Renovate fusionnées récemment, les fermetures sans fusion récentes et les checks utiles à la qualification opérationnelle.
 5. `n8n` supprime d'abord les anciens artefacts, puis lit le JSON frais produit par le worker.
 6. `n8n` envoie l’email en réutilisant directement le sujet, le texte et le HTML déjà préparés.
 
 ## Exécution explicite de Renovate
 
-`Renovate` n’est pas un daemon dans cette architecture. Il s’exécute explicitement quand vous en avez besoin :
+La stratégie retenue dans ce lot est la suivante :
+
+- le workflow quotidien `n8n` ne déclenche pas `Renovate` ;
+- l’exécution explicite de `Renovate` est supervisée par le worker `.NET` ;
+- le worker lance la commande `docker compose --profile maintenance run --rm renovate`, capture le résultat, persiste un artefact dédié, puis l’intègre aux rapports suivants.
+
+Commande recommandée pour lancer un cycle explicite complet avec supervision côté worker :
+
+```powershell
+dotnet run --project .\src\RepoOps.Worker -- --run-once --run-renovate --emit-json-to-stdout --input-source=manual-renovate
+```
+
+Cette commande suppose qu'un fichier `.env` valable est présent à la racine du dépôt ou que les variables attendues par `docker compose` sont déjà chargées dans l'environnement du shell.
+
+Commande directe conservée pour une exécution brute de `Renovate` sans enrichissement du rapport :
 
 ```powershell
 docker compose --profile maintenance run --rm renovate
@@ -174,11 +189,13 @@ Cette couche Aspire sert au pilotage local. Pour les exécutions réelles de la 
 - les PR fusionnées sont lues dans une fenêtre glissante configurable, limitée au dernier lot de PR fermées renvoyé par l’API ;
 - la qualification des PR ouvertes repose sur la combinaison des check-runs et du statut combiné GitHub sur la tête de PR ;
 - les PR sans check décisif sont classées dans `pullRequestStatuses.blocked` avec une qualification incomplète ;
+- l’exécution explicite de `Renovate` supervisée par le worker doit être lancée depuis l’hôte, pas depuis le conteneur `worker` ;
+- la qualification du run `Renovate` repose encore sur des heuristiques de logs `stdout` et `stderr` ;
 - la collecte des vulnérabilités reste encore placeholder ;
 - le déclenchement de maintenance repose encore sur un fichier partagé simple ;
 - le worker fonctionne encore en veille par scrutation légère, pas via une API dédiée ;
 - la configuration SMTP et les destinataires restent à finaliser manuellement dans `n8n` ;
-- `Renovate` n’est pas encore orchestré par une planification dédiée dans le dépôt ;
+- le workflow quotidien exploite le dernier résultat connu de `Renovate`, mais ne le relance pas automatiquement ;
 - le superviseur IA n’est pas implémenté.
 
 ## Vérifications locales
@@ -195,8 +212,16 @@ docker compose exec postgres sh -lc 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRE
 docker compose exec n8n n8n import:workflow --input=/files/workflows/repo-ops-daily-maintenance.json
 dotnet build .\RepoOps.sln
 dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --run-once --emit-json-to-stdout --input-source=validation-locale
+dotnet run --project .\src\RepoOps.Worker -- --run-once --run-renovate --emit-json-to-stdout --input-source=validation-renovate
 docker compose --profile maintenance run --rm renovate --version
 docker compose down
+```
+
+Exemple de validation courte sans `.env` réel, en forçant le worker à appeler `docker compose` avec `--env-file .env.example` :
+
+```powershell
+$env:RENOVATE_EXECUTION_ARGUMENTS="compose --env-file .env.example --profile maintenance run --rm renovate --version"
+dotnet run --project .\src\RepoOps.Worker -- --run-once --run-renovate --emit-json-to-stdout --input-source=validation-renovate-envfile
 ```
 
 Exemple de configuration minimale pour une exécution locale ciblée :
@@ -214,6 +239,13 @@ Exemple de statut attendu en sortie :
   "summary": {
     "status": "Success|Partial|Failed"
   },
+  "renovateExecution": {
+    "status": "NotTriggered|Succeeded|NoUpdatesDetected|PullRequestsUpdated|Failed",
+    "triggerRequested": false,
+    "includedFromLatestKnownExecution": true,
+    "mode": "daily-report-last-known",
+    "command": "docker compose --profile maintenance run --rm renovate"
+  },
   "pullRequestStatuses": {
     "readyForReview": [],
     "blocked": [],
@@ -228,4 +260,5 @@ Exemple de log utile en cas de qualification partielle :
 
 ```text
 [github] Check-runs indisponibles pour owner/repo#123 : GitHub a répondu avec le statut HTTP 404
+[renovate] INFO: Repository started
 ```

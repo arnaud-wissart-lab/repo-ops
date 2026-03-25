@@ -37,6 +37,7 @@ Déplacer progressivement la logique utile vers la couche `.NET`, tout en conser
 
 - collecte GitHub structurée dans le worker ;
 - qualification opérationnelle des PR Renovate dans le worker ;
+- supervision d’une exécution explicite de Renovate avec artefact de reporting dédié ;
 - consolidation de résultats multi-repo ;
 - génération de synthèse plus complète ;
 - workflows `n8n` mieux alignés avec les sorties du worker ;
@@ -53,6 +54,7 @@ Déplacer progressivement la logique utile vers la couche `.NET`, tout en conser
 - un cycle quotidien complet peut être observé localement ;
 - la synthèse s’appuie majoritairement sur la couche `.NET` ;
 - le worker sait interroger GitHub sur un premier périmètre réel sans casser le contrat de sortie ;
+- le worker sait intégrer le dernier résultat connu d’une exécution explicite de Renovate sans déplacer cette logique dans `n8n` ;
 - les scripts restants ont un rôle limité, explicite et documenté.
 
 ## Phase 3 - Superviseur IA

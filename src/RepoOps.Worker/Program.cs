@@ -8,6 +8,25 @@ builder.Configuration.AddInMemoryCollection(ParseWorkerOverrides(args));
 builder.Logging.SetMinimumLevel(ResolveLogLevel(builder.Configuration["LOG_LEVEL"]));
 builder.Services.Configure<RepoOpsWorkerOptions>(
     builder.Configuration.GetSection(RepoOpsWorkerOptions.SectionName));
+builder.Services.AddOptions<RenovateExecutionOptions>()
+    .Configure<IConfiguration>((options, configuration) =>
+    {
+        configuration.GetSection(RenovateExecutionOptions.SectionName).Bind(options);
+        options.Command = configuration["RENOVATE_EXECUTION_COMMAND"] ?? options.Command;
+        options.Arguments = configuration["RENOVATE_EXECUTION_ARGUMENTS"] ?? options.Arguments;
+        options.OutputPath = configuration["RENOVATE_EXECUTION_OUTPUT_PATH"] ?? options.OutputPath;
+        options.WorkingDirectory = configuration["RENOVATE_EXECUTION_WORKING_DIRECTORY"] ?? options.WorkingDirectory;
+
+        if (int.TryParse(configuration["RENOVATE_EXECUTION_TIMEOUT_SECONDS"], out var timeoutSeconds))
+        {
+            options.TimeoutSeconds = timeoutSeconds;
+        }
+
+        if (int.TryParse(configuration["RENOVATE_EXECUTION_MAX_CAPTURED_LINES"], out var maxCapturedLines))
+        {
+            options.MaxCapturedLines = maxCapturedLines;
+        }
+    });
 builder.Services.AddOptions<GitHubOptions>()
     .Configure<IConfiguration>((options, configuration) =>
     {
@@ -22,6 +41,7 @@ builder.Services.AddOptions<GitHubOptions>()
     });
 builder.Services.AddHttpClient<GitHubApiClient>();
 builder.Services.AddSingleton<GitHubMaintenanceCollector>();
+builder.Services.AddSingleton<RenovateExecutionService>();
 builder.Services.AddSingleton<MaintenanceReportBuilder>();
 builder.Services.AddSingleton<MaintenanceDigestRenderer>();
 builder.Services.AddSingleton<MaintenanceReportPersistenceService>();
@@ -45,6 +65,7 @@ static LogLevel ResolveLogLevel(string? value) => value?.ToLowerInvariant() swit
 
 static string[] ParsePassthroughArguments(IEnumerable<string> args) =>
     args.Where(arg => !arg.StartsWith("--run-once", StringComparison.OrdinalIgnoreCase)
+        && !arg.StartsWith("--run-renovate", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--emit-json-to-stdout", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--input-source=", StringComparison.OrdinalIgnoreCase))
         .ToArray();
@@ -59,6 +80,12 @@ static Dictionary<string, string?> ParseWorkerOverrides(IEnumerable<string> args
         {
             overrides["RepoOps:Worker:ContinuousModeEnabled"] = "false";
             overrides["RepoOps:Worker:RunOnStartup"] = "true";
+            continue;
+        }
+
+        if (string.Equals(arg, "--run-renovate", StringComparison.OrdinalIgnoreCase))
+        {
+            overrides["RepoOps:Worker:TriggerRenovateExecution"] = "true";
             continue;
         }
 

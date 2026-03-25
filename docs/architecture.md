@@ -16,12 +16,13 @@
 1. `n8n` déclenche un workflow quotidien.
 2. Le workflow écrit un fichier de trigger partagé.
 3. Le worker `.NET`, maintenu en veille légère, détecte ce trigger.
-4. Le worker produit les artefacts de sortie :
+4. Le worker charge le dernier résultat connu d’une exécution explicite de `Renovate`, sans relancer `Renovate` dans ce cycle quotidien.
+5. Le worker produit les artefacts de sortie :
    - JSON stable
    - texte
    - HTML
-5. `n8n` lit le JSON frais du worker après purge des anciens artefacts.
-6. `n8n` envoie l’email à partir du digest déjà produit.
+6. `n8n` lit le JSON frais du worker après purge des anciens artefacts.
+7. `n8n` envoie l’email à partir du digest déjà produit.
 
 ## Rôles des composants
 
@@ -77,7 +78,8 @@ Choix volontaire dans ce lot : `Renovate` reste hors AppHost. La maintenance exp
 Dans ce lot :
 
 - il ne tourne plus en boucle infinie ;
-- il est déclenché explicitement ;
+- il est déclenché explicitement via le worker `.NET`, qui appelle `docker compose --profile maintenance run --rm renovate` ;
+- son dernier résultat connu est persistant et réutilisable par le flux quotidien ;
 - il reste attaché au runtime Compose.
 
 ### n8n
@@ -97,7 +99,15 @@ Les scripts du dossier `scripts/` restent présents comme utilitaires transitoir
 
 ## Exécution explicite de Renovate
 
-Commande recommandée :
+Commande recommandée pour un cycle supervisé par le worker :
+
+```powershell
+dotnet run --project .\src\RepoOps.Worker -- --run-once --run-renovate --emit-json-to-stdout --input-source=manual-renovate
+```
+
+Cette commande suppose qu'un `.env` opérationnel existe à la racine du dépôt, ou qu'un argument explicite `RENOVATE_EXECUTION_ARGUMENTS` fournisse l'option `--env-file` adaptée.
+
+Commande brute encore disponible :
 
 ```powershell
 docker compose --profile maintenance run --rm renovate
@@ -128,6 +138,7 @@ docker compose --profile maintenance run --rm renovate --version
 - porter la logique métier de collecte GitHub, consolidation et synthèse ;
 - produire le contrat de sortie de référence ;
 - qualifier les PR Renovate pour aider la décision opérationnelle ;
+- superviser l’exécution explicite de `Renovate` et en conserver un artefact exploitable ;
 - fournir les artefacts consommés par `n8n`.
 
 ### Ce qui relève encore de n8n
@@ -141,11 +152,12 @@ docker compose --profile maintenance run --rm renovate --version
 
 - la collecte GitHub reste limitée au périmètre REST minimal utile à ce lot ;
 - la qualification des PR ouvertes dépend encore de la disponibilité des check-runs et du statut combiné sur chaque dépôt ;
+- la qualification d’une exécution `Renovate` reste basée sur l’analyse de ses logs, pas sur un rapport structuré natif stabilisé ;
 - la détection des vulnérabilités n'est pas encore branchée ;
 - le déclenchement repose sur un fichier partagé simple ;
 - le worker reste pour l'instant en veille par scrutation légère ;
 - l'intégration GitHub n'exploite pas encore les issues, les dépendances de sécurité ni l'historique détaillé d'exécution de Renovate ;
-- `Renovate` n’est pas encore intégré à une planification de maintenance dédiée dans le dépôt.
+- le flux quotidien n8n ne relance pas `Renovate` automatiquement ; il exploite le dernier résultat connu.
 
 ## Diagramme
 
@@ -158,6 +170,8 @@ flowchart LR
     N8N --> Trigger["Fichier de déclenchement"]
     Trigger --> Worker
     Worker --> Reports["JSON + TXT + HTML"]
+    Worker -. exécution explicite .-> Renovate
+    Worker --> RenovateArtifact["Artefact renovate-execution.json"]
     N8N --> Reports
     N8N --> Mail["Email SMTP"]
     Renovate --> GitHub["Dépôts GitHub en allowlist"]

@@ -12,6 +12,7 @@ Le flux retenu dans ce lot est volontairement simple :
 - création d’un trigger pour le worker `.NET` ;
 - lecture du rapport JSON produit par le worker ;
 - envoi d’un email à partir du digest déjà préparé.
+- aucune exécution automatique de `Renovate` dans le workflow quotidien.
 
 ## Flux réel retenu
 
@@ -22,6 +23,8 @@ Le flux retenu dans ce lot est volontairement simple :
 5. un nœud `Code` parse le JSON ;
 6. un dernier nœud `Code` se limite à exposer le sujet, le texte et le HTML déjà fournis par le worker ;
 7. un nœud `Email Send` envoie le récapitulatif.
+
+Le rapport lu par `n8n` peut déjà inclure une section `renovateExecution` issue d’un run explicite supervisé en dehors du workflow quotidien.
 
 ## Prérequis
 
@@ -56,3 +59,4 @@ docker compose exec n8n n8n import:workflow --input=/files/workflows/repo-ops-da
 - les destinataires du workflow doivent être remplacés manuellement avant activation ;
 - le workflow suppose que le worker écrit correctement ses artefacts dans `reports/` ;
 - le déclenchement du worker repose encore sur un fichier partagé plutôt que sur une API dédiée.
+- si vous voulez relancer `Renovate`, faites-le explicitement via le worker `.NET` ou via `docker compose`, pas depuis ce workflow.

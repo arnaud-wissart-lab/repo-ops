@@ -12,6 +12,8 @@ public sealed class RepoOpsWorkerOptions
 
     public string InputSource { get; set; } = "worker-dotnet";
 
+    public bool TriggerRenovateExecution { get; set; }
+
     public bool EmitJsonToStdout { get; set; }
 
     public string ReportOutputPath { get; set; } = "reports/worker-summary.json";

@@ -57,6 +57,8 @@ Dans l’état actuel, le worker :
 - génère un sujet, un texte brut et un HTML simples ;
 - récupère les PR Renovate ouvertes, les PR Renovate fusionnées récemment et les fermetures récentes sans fusion ;
 - qualifie les PR ouvertes en `readyForReview`, `blocked` ou `failedChecks` à partir des check-runs et du statut combiné ;
+- calcule une décision d’auto-merge par PR (`AutoMerge`, `ManualReview`, `Blocked`, `Failed`) ;
+- peut exécuter un merge GitHub réel si la politique est activée et si le mode dry-run est désactivé ;
 - peut émettre le JSON sur `stdout` en mode explicite.
 
 ### Aspire AppHost
@@ -138,8 +140,21 @@ docker compose --profile maintenance run --rm renovate --version
 - porter la logique métier de collecte GitHub, consolidation et synthèse ;
 - produire le contrat de sortie de référence ;
 - qualifier les PR Renovate pour aider la décision opérationnelle ;
+- décider si une PR Renovate doit être auto-mergée, revue manuellement ou bloquée ;
+- exécuter éventuellement le merge GitHub réel dans un mode explicitement activé ;
 - superviser l’exécution explicite de `Renovate` et en conserver un artefact exploitable ;
 - fournir les artefacts consommés par `n8n`.
+
+## Règles d’auto-merge retenues
+
+- origine `Renovate` obligatoire ;
+- PR ouverte et non brouillon ;
+- checks GitHub qualifiés en succès ;
+- `mergeable = true` et `mergeable_state = clean` ;
+- mises à jour `major` en revue manuelle ;
+- mises à jour `minor` en revue manuelle tant qu’elles ne sont pas explicitement autorisées ;
+- mises à jour `patch` éligibles selon la politique configurée ;
+- mode dry-run actif par défaut.
 
 ### Ce qui relève encore de n8n
 
@@ -152,7 +167,9 @@ docker compose --profile maintenance run --rm renovate --version
 
 - la collecte GitHub reste limitée au périmètre REST minimal utile à ce lot ;
 - la qualification des PR ouvertes dépend encore de la disponibilité des check-runs et du statut combiné sur chaque dépôt ;
+- le type de version est déduit des labels GitHub ou du titre de PR quand la comparaison sémantique est possible ;
 - la qualification d’une exécution `Renovate` reste basée sur l’analyse de ses logs, pas sur un rapport structuré natif stabilisé ;
+- l’auto-merge réel reste conservateur et peut refuser des PR pourtant mergeables si le contexte GitHub n’est pas strictement `clean` ;
 - la détection des vulnérabilités n'est pas encore branchée ;
 - le déclenchement repose sur un fichier partagé simple ;
 - le worker reste pour l'instant en veille par scrutation légère ;

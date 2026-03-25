@@ -25,6 +25,7 @@ public sealed class MaintenanceWorkflowService(
             Summary = report.Summary,
             RenovateExecution = report.RenovateExecution,
             PullRequestStatuses = report.PullRequestStatuses,
+            AutoMerge = report.AutoMerge,
             Messages = report.Messages,
             Recommendations = report.Recommendations,
             Digest = digestRenderer.Render(report)

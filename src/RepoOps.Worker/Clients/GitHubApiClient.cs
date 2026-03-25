@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
+using System.Text;
 using Microsoft.Extensions.Options;
 using RepoOps.Worker.Models;
 using RepoOps.Worker.Options;
@@ -47,13 +48,52 @@ public sealed class GitHubApiClient(
         return payload?.CheckRuns ?? [];
     }
 
+    public Task<GitHubPullRequestDto?> GetPullRequestDetailsAsync(
+        string owner,
+        string repository,
+        int pullRequestNumber,
+        CancellationToken cancellationToken)
+    {
+        var uri = $"repos/{owner}/{repository}/pulls/{pullRequestNumber}";
+        return GetAsync<GitHubPullRequestDto>(uri, cancellationToken);
+    }
+
+    public Task<GitHubMergePullRequestResponseDto> MergePullRequestAsync(
+        string owner,
+        string repository,
+        int pullRequestNumber,
+        string mergeMethod,
+        CancellationToken cancellationToken)
+    {
+        var uri = $"repos/{owner}/{repository}/pulls/{pullRequestNumber}/merge";
+        var payload = new { merge_method = mergeMethod };
+        return SendAsync<GitHubMergePullRequestResponseDto>(HttpMethod.Put, uri, payload, cancellationToken)!;
+    }
+
     private async Task<T?> GetAsync<T>(string relativeUri, CancellationToken cancellationToken)
+    {
+        return await SendAsync<T>(HttpMethod.Get, relativeUri, payload: null, cancellationToken);
+    }
+
+    private async Task<T?> SendAsync<T>(
+        HttpMethod method,
+        string relativeUri,
+        object? payload,
+        CancellationToken cancellationToken)
     {
         ConfigureClient();
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, relativeUri);
+        using var request = new HttpRequestMessage(method, relativeUri);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
         request.Headers.Add("X-GitHub-Api-Version", "2022-11-28");
+
+        if (payload is not null)
+        {
+            request.Content = new StringContent(
+                JsonSerializer.Serialize(payload, JsonOptions),
+                Encoding.UTF8,
+                "application/json");
+        }
 
         HttpResponseMessage response;
 

@@ -37,6 +37,11 @@ public sealed class MaintenanceDigestRenderer
         builder.AppendLine($"- Code de sortie : {FormatExitCode(report.RenovateExecution.ExitCode)}");
         builder.AppendLine($"- Résumé : {report.RenovateExecution.Summary}");
         builder.AppendLine();
+        builder.AppendLine("Auto-merge contrôlé :");
+        builder.AppendLine($"- Activé : {(report.AutoMerge.Enabled ? "oui" : "non")}");
+        builder.AppendLine($"- Dry-run : {(report.AutoMerge.DryRunEnabled ? "oui" : "non")}");
+        builder.AppendLine($"- Méthode de merge : {report.AutoMerge.MergeMethod}");
+        builder.AppendLine();
         builder.AppendLine("Compteurs :");
         builder.AppendLine($"- PR créées : {report.Summary.Counts.CreatedPullRequests}");
         builder.AppendLine($"- PR fusionnées : {report.Summary.Counts.MergedPullRequests}");
@@ -72,6 +77,30 @@ public sealed class MaintenanceDigestRenderer
             "PR fermées sans fusion",
             report.PullRequestStatuses.ClosedWithoutMerge,
             "Aucune PR fermée sans fusion détectée récemment.");
+        builder.AppendLine();
+        AppendSection(
+            builder,
+            "PR prêtes pour auto-merge",
+            report.AutoMerge.ReadyForMerge,
+            "Aucune PR prête pour auto-merge.");
+        builder.AppendLine();
+        AppendSection(
+            builder,
+            "PR à revue manuelle",
+            report.AutoMerge.ManualReviewPullRequests,
+            "Aucune PR à revue manuelle.");
+        builder.AppendLine();
+        AppendSection(
+            builder,
+            "PR auto-mergées",
+            report.AutoMerge.AutoMergedPullRequests,
+            "Aucune PR auto-mergée dans ce cycle.");
+        builder.AppendLine();
+        AppendSection(
+            builder,
+            "PR en échec d'auto-merge",
+            report.AutoMerge.FailedPullRequests,
+            "Aucun échec d'auto-merge.");
         builder.AppendLine();
         builder.AppendLine("Actions manuelles recommandées :");
 
@@ -134,6 +163,12 @@ public sealed class MaintenanceDigestRenderer
                       <li>Code de sortie : {Escape(FormatExitCode(report.RenovateExecution.ExitCode))}</li>
                     </ul>
                     <p><strong>Résumé :</strong> {Escape(report.RenovateExecution.Summary)}</p>
+                    <h2>Auto-merge contrôlé</h2>
+                    <ul>
+                      <li>Activé : {Escape(report.AutoMerge.Enabled ? "oui" : "non")}</li>
+                      <li>Dry-run : {Escape(report.AutoMerge.DryRunEnabled ? "oui" : "non")}</li>
+                      <li>Méthode de merge : {Escape(report.AutoMerge.MergeMethod)}</li>
+                    </ul>
                     <h2>Compteurs</h2>
                     <ul>
                       <li>PR créées : {report.Summary.Counts.CreatedPullRequests}</li>
@@ -151,6 +186,14 @@ public sealed class MaintenanceDigestRenderer
                     {RenderList(report.PullRequestStatuses.MergedRecently, "Aucune PR fusionnée récemment.")}
                     <h2>PR fermées sans fusion</h2>
                     {RenderList(report.PullRequestStatuses.ClosedWithoutMerge, "Aucune PR fermée sans fusion détectée récemment.")}
+                    <h2>PR prêtes pour auto-merge</h2>
+                    {RenderList(report.AutoMerge.ReadyForMerge, "Aucune PR prête pour auto-merge.")}
+                    <h2>PR à revue manuelle</h2>
+                    {RenderList(report.AutoMerge.ManualReviewPullRequests, "Aucune PR à revue manuelle.")}
+                    <h2>PR auto-mergées</h2>
+                    {RenderList(report.AutoMerge.AutoMergedPullRequests, "Aucune PR auto-mergée dans ce cycle.")}
+                    <h2>PR en échec d'auto-merge</h2>
+                    {RenderList(report.AutoMerge.FailedPullRequests, "Aucun échec d'auto-merge.")}
                     <h2>Actions manuelles recommandées</h2>
                     {RenderList(report.Recommendations.ManualActions, "Aucune action manuelle supplémentaire.")}
                     <h2>Notes</h2>

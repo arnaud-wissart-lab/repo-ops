@@ -6,6 +6,8 @@ public sealed class GitHubPullRequestDto
 {
     public int Number { get; init; }
 
+    public string State { get; init; } = string.Empty;
+
     public string Title { get; init; } = string.Empty;
 
     public string HtmlUrl { get; init; } = string.Empty;
@@ -16,9 +18,15 @@ public sealed class GitHubPullRequestDto
 
     public DateTimeOffset? ClosedAt { get; init; }
 
+    public bool? Mergeable { get; init; }
+
+    public string MergeableState { get; init; } = string.Empty;
+
     public GitHubUserDto User { get; init; } = new();
 
     public GitHubPullRequestHeadDto Head { get; init; } = new();
+
+    public IReadOnlyList<GitHubLabelDto> Labels { get; init; } = Array.Empty<GitHubLabelDto>();
 }
 
 public sealed class GitHubUserDto
@@ -54,6 +62,20 @@ public sealed class GitHubCheckRunDto
     public string Conclusion { get; init; } = string.Empty;
 
     public string HtmlUrl { get; init; } = string.Empty;
+}
+
+public sealed class GitHubLabelDto
+{
+    public string Name { get; init; } = string.Empty;
+}
+
+public sealed class GitHubMergePullRequestResponseDto
+{
+    public bool Merged { get; init; }
+
+    public string Message { get; init; } = string.Empty;
+
+    public string Sha { get; init; } = string.Empty;
 }
 
 public sealed class GitHubApiErrorDto

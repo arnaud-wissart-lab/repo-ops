@@ -27,6 +27,30 @@ builder.Services.AddOptions<RenovateExecutionOptions>()
             options.MaxCapturedLines = maxCapturedLines;
         }
     });
+builder.Services.AddOptions<AutoMergeOptions>()
+    .Configure<IConfiguration>((options, configuration) =>
+    {
+        configuration.GetSection(AutoMergeOptions.SectionName).Bind(options);
+
+        if (bool.TryParse(configuration["AUTOMERGE_ENABLED"], out var enabled))
+        {
+            options.Enabled = enabled;
+        }
+
+        if (bool.TryParse(configuration["AUTOMERGE_DRY_RUN_ENABLED"], out var dryRunEnabled))
+        {
+            options.DryRunEnabled = dryRunEnabled;
+        }
+
+        options.MergeMethod = configuration["AUTOMERGE_MERGE_METHOD"] ?? options.MergeMethod;
+
+        var allowedUpdateTypes = configuration["AUTOMERGE_ALLOWED_UPDATE_TYPES"];
+        if (!string.IsNullOrWhiteSpace(allowedUpdateTypes))
+        {
+            options.AllowedUpdateTypes = allowedUpdateTypes
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        }
+    });
 builder.Services.AddOptions<GitHubOptions>()
     .Configure<IConfiguration>((options, configuration) =>
     {
@@ -41,6 +65,8 @@ builder.Services.AddOptions<GitHubOptions>()
     });
 builder.Services.AddHttpClient<GitHubApiClient>();
 builder.Services.AddSingleton<GitHubMaintenanceCollector>();
+builder.Services.AddSingleton<PullRequestDecisionService>();
+builder.Services.AddSingleton<PullRequestAutoMergeService>();
 builder.Services.AddSingleton<RenovateExecutionService>();
 builder.Services.AddSingleton<MaintenanceReportBuilder>();
 builder.Services.AddSingleton<MaintenanceDigestRenderer>();
@@ -66,6 +92,8 @@ static LogLevel ResolveLogLevel(string? value) => value?.ToLowerInvariant() swit
 static string[] ParsePassthroughArguments(IEnumerable<string> args) =>
     args.Where(arg => !arg.StartsWith("--run-once", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--run-renovate", StringComparison.OrdinalIgnoreCase)
+        && !arg.StartsWith("--enable-auto-merge", StringComparison.OrdinalIgnoreCase)
+        && !arg.StartsWith("--disable-auto-merge-dry-run", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--emit-json-to-stdout", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--input-source=", StringComparison.OrdinalIgnoreCase))
         .ToArray();
@@ -86,6 +114,18 @@ static Dictionary<string, string?> ParseWorkerOverrides(IEnumerable<string> args
         if (string.Equals(arg, "--run-renovate", StringComparison.OrdinalIgnoreCase))
         {
             overrides["RepoOps:Worker:TriggerRenovateExecution"] = "true";
+            continue;
+        }
+
+        if (string.Equals(arg, "--enable-auto-merge", StringComparison.OrdinalIgnoreCase))
+        {
+            overrides["RepoOps:AutoMerge:Enabled"] = "true";
+            continue;
+        }
+
+        if (string.Equals(arg, "--disable-auto-merge-dry-run", StringComparison.OrdinalIgnoreCase))
+        {
+            overrides["RepoOps:AutoMerge:DryRunEnabled"] = "false";
             continue;
         }
 

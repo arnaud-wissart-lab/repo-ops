@@ -44,6 +44,7 @@ Par défaut, il démarre :
 - future base pour la supervision.
 
 Dans ce lot, le worker devient la source de vérité du reporting et interroge réellement GitHub pour une première collecte ciblée.
+Il calcule également des décisions d’auto-merge contrôlé sur les PR Renovate ouvertes.
 
 ### Aspire AppHost
 
@@ -82,9 +83,29 @@ Le dossier `scripts/` reste présent pour la transition, mais il ne fait plus pa
    - [`worker-summary.txt`](./reports/worker-summary.txt)
    - [`worker-summary.html`](./reports/worker-summary.html)
    - [`renovate-execution.json`](./reports/renovate-execution.json) lorsqu'une exécution explicite de `Renovate` est lancée via le worker
-   Le worker interroge GitHub avec `GITHUB_TOKEN` pour récupérer les PR Renovate ouvertes, les PR Renovate fusionnées récemment, les fermetures sans fusion récentes et les checks utiles à la qualification opérationnelle.
+   Le worker interroge GitHub avec `GITHUB_TOKEN` pour récupérer les PR Renovate ouvertes, les PR Renovate fusionnées récemment, les fermetures sans fusion récentes, les checks utiles à la qualification opérationnelle et les informations nécessaires à une décision d’auto-merge contrôlé.
 5. `n8n` supprime d'abord les anciens artefacts, puis lit le JSON frais produit par le worker.
 6. `n8n` envoie l’email en réutilisant directement le sujet, le texte et le HTML déjà préparés.
+
+## Auto-merge contrôlé
+
+Le worker applique une politique simple et prudente :
+
+- seules les PR d’origine `Renovate` sont évaluées ;
+- les checks doivent être verts ;
+- la PR ne doit pas être en brouillon ;
+- GitHub doit indiquer `mergeable = true` et `mergeable_state = clean` ;
+- les mises à jour `major` restent en revue manuelle ;
+- par défaut, seules les mises à jour `patch` sont éligibles à l’auto-merge.
+
+La décision calculée pour chaque PR est l’une des suivantes :
+
+- `AutoMerge`
+- `ManualReview`
+- `Blocked`
+- `Failed`
+
+Le merge réel reste désactivé par défaut. Le système produit d’abord la décision et, si l’option est activée, peut ensuite exécuter le merge via l’API GitHub.
 
 ## Exécution explicite de Renovate
 
@@ -189,6 +210,9 @@ Cette couche Aspire sert au pilotage local. Pour les exécutions réelles de la 
 - les PR fusionnées sont lues dans une fenêtre glissante configurable, limitée au dernier lot de PR fermées renvoyé par l’API ;
 - la qualification des PR ouvertes repose sur la combinaison des check-runs et du statut combiné GitHub sur la tête de PR ;
 - les PR sans check décisif sont classées dans `pullRequestStatuses.blocked` avec une qualification incomplète ;
+- le type de version utilisé pour la décision d’auto-merge est déduit des labels GitHub ou du titre de PR lorsqu’une comparaison sémantique est possible ;
+- l’auto-merge réel reste volontairement très conservateur : `mergeable_state = clean`, checks verts et politique explicite requise ;
+- le merge réel n’est tenté que si `AUTOMERGE_ENABLED=true` et `AUTOMERGE_DRY_RUN_ENABLED=false` ;
 - l’exécution explicite de `Renovate` supervisée par le worker doit être lancée depuis l’hôte, pas depuis le conteneur `worker` ;
 - la qualification du run `Renovate` repose encore sur des heuristiques de logs `stdout` et `stderr` ;
 - la collecte des vulnérabilités reste encore placeholder ;
@@ -213,6 +237,9 @@ docker compose exec n8n n8n import:workflow --input=/files/workflows/repo-ops-da
 dotnet build .\RepoOps.sln
 dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --run-once --emit-json-to-stdout --input-source=validation-locale
 dotnet run --project .\src\RepoOps.Worker -- --run-once --run-renovate --emit-json-to-stdout --input-source=validation-renovate
+$env:AUTOMERGE_ENABLED="true"
+$env:AUTOMERGE_DRY_RUN_ENABLED="true"
+dotnet run --project .\src\RepoOps.Worker -- --run-once --enable-auto-merge --emit-json-to-stdout --input-source=validation-automerge
 docker compose --profile maintenance run --rm renovate --version
 docker compose down
 ```
@@ -232,6 +259,28 @@ $env:RENOVATE_REPOSITORIES="owner/repo-a,owner/repo-b"
 dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --run-once --emit-json-to-stdout --input-source=test-local
 ```
 
+Exemple de simulation d’auto-merge sans merge réel :
+
+```powershell
+$env:GITHUB_TOKEN="ghp_votre_jeton"
+$env:RENOVATE_REPOSITORIES="owner/repo-a"
+$env:AUTOMERGE_ENABLED="true"
+$env:AUTOMERGE_DRY_RUN_ENABLED="true"
+$env:AUTOMERGE_ALLOWED_UPDATE_TYPES="patch"
+dotnet run --project .\src\RepoOps.Worker -- --run-once --enable-auto-merge --emit-json-to-stdout --input-source=test-automerge-dryrun
+```
+
+Exemple d’activation explicite du merge réel :
+
+```powershell
+$env:GITHUB_TOKEN="ghp_votre_jeton"
+$env:RENOVATE_REPOSITORIES="owner/repo-a"
+$env:AUTOMERGE_ENABLED="true"
+$env:AUTOMERGE_DRY_RUN_ENABLED="false"
+$env:AUTOMERGE_ALLOWED_UPDATE_TYPES="patch"
+dotnet run --project .\src\RepoOps.Worker -- --run-once --enable-auto-merge --disable-auto-merge-dry-run --emit-json-to-stdout --input-source=test-automerge-reel
+```
+
 Exemple de statut attendu en sortie :
 
 ```json
@@ -245,6 +294,17 @@ Exemple de statut attendu en sortie :
     "includedFromLatestKnownExecution": true,
     "mode": "daily-report-last-known",
     "command": "docker compose --profile maintenance run --rm renovate"
+  },
+  "autoMerge": {
+    "enabled": false,
+    "dryRunEnabled": true,
+    "mergeMethod": "squash",
+    "readyForMerge": [],
+    "manualReviewPullRequests": [],
+    "blockedPullRequests": [],
+    "failedPullRequests": [],
+    "autoMergedPullRequests": [],
+    "evaluations": []
   },
   "pullRequestStatuses": {
     "readyForReview": [],

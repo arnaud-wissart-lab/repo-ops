@@ -16,6 +16,8 @@ public sealed class GitHubCollectionResult
 
     public PullRequestStatuses PullRequestStatuses { get; init; } = new();
 
+    public AutoMergeSummary AutoMerge { get; init; } = new();
+
     public IReadOnlyList<string> Logs { get; init; } = Array.Empty<string>();
 
     public IReadOnlyList<string> Notes { get; init; } = Array.Empty<string>();

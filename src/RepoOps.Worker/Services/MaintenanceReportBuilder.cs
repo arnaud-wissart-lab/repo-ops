@@ -83,6 +83,7 @@ public sealed class MaintenanceReportBuilder(
             },
             RenovateExecution = renovateExecution,
             PullRequestStatuses = collectionResult.PullRequestStatuses,
+            AutoMerge = collectionResult.AutoMerge,
             Messages = new MaintenanceMessages
             {
                 Logs = logs.Distinct(StringComparer.Ordinal).ToArray(),

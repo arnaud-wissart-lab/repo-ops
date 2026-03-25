@@ -48,12 +48,36 @@ Cycle cible :
    docker compose run --rm --entrypoint /bin/sh renovate -lc "exec renovate"
    ```
 
+Les variables `N8N_BASIC_AUTH_*` restent documentées dans [`.env.example`](./.env.example) pour une protection future par reverse proxy, mais elles ne sont pas branchées sur la stack locale actuelle.
+
 ## Structure du dépôt
 
 - [`docker-compose.yml`](./docker-compose.yml) décrit la stack locale.
+- [`.env.example`](./.env.example) centralise toutes les variables attendues.
+- [`AGENTS.md`](./AGENTS.md) fixe les règles de travail pour les contributions futures.
 - [`renovate/config.js`](./renovate/config.js) porte la configuration self-hosted d’administration.
 - [`docs/architecture.md`](./docs/architecture.md) décrit les responsabilités et les flux.
 - [`docs/rollout-plan.md`](./docs/rollout-plan.md) découpe l’adoption en phases.
+- [`n8n/README.md`](./n8n/README.md) précise l’usage prévu du dossier d’orchestration.
+- Le dossier `scripts/` contient les placeholders de collecte et d’envoi.
+- Le dossier `templates/` contient les modèles de synthèse quotidiens.
+
+## Vérifications locales
+
+Commandes minimales à exécuter après avoir renseigné `.env` :
+
+```powershell
+Copy-Item .env.example .env
+docker compose config
+docker compose up -d --wait
+docker compose ps
+docker compose logs --tail=100 postgres n8n renovate
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\collect-results.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\send-summary.ps1
+docker compose exec postgres sh -lc 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+docker compose run --rm --entrypoint /bin/sh renovate -lc "renovate --version"
+docker compose down
+```
 
 ## Prochaines étapes
 

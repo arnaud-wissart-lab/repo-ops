@@ -18,6 +18,8 @@
 - Documenter chaque nouveau fichier important créé ou modifié.
 - Expliquer les hypothèses retenues lorsqu’une valeur exacte n’est pas connue.
 - Maintenir les README et la documentation d’architecture à jour quand le comportement change.
+- Toute nouvelle variable d’environnement utilisée doit être déclarée dans [`.env.example`](./.env.example).
+- Toute nouvelle variable conservée en réserve doit être explicitement signalée comme non branchée si elle n’est pas consommée par la stack.
 
 ## Validation
 

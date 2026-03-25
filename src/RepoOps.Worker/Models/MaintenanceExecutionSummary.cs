@@ -20,11 +20,5 @@ public sealed class MaintenanceExecutionSummary
 
     public IReadOnlyList<string> RemainingVulnerabilities { get; init; } = Array.Empty<string>();
 
-    public IReadOnlyList<string> ManualActions { get; init; } = Array.Empty<string>();
-
-    public IReadOnlyList<string> LogMessages { get; init; } = Array.Empty<string>();
-
-    public IReadOnlyList<string> Notes { get; init; } = Array.Empty<string>();
-
     public MaintenanceCounts Counts { get; init; } = new();
 }

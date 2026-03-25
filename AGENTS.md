@@ -9,6 +9,7 @@
 - `Aspire` reste une couche locale de pilotage et de visualisation, pas un orchestrateur de production.
 - Le worker `.NET` est la cible principale pour la logique métier future.
 - `n8n` conserve un rôle ciblé de planification simple, d’enchaînement et de notification.
+- Les scripts shell et PowerShell ne doivent exister qu’en compatibilité transitoire ou en secours clairement documenté.
 
 ## Communication
 
@@ -25,6 +26,7 @@
 - Ne pas introduire de dépendance lourde sans justification technique claire.
 - Préserver la vocation du dépôt : orchestrer des dépôts tiers sans se substituer à leur logique applicative propre.
 - Repositionner explicitement comme transitoire tout script qui n’est plus la cible principale de l’architecture.
+- Préférer la production d’un contrat de sortie côté `.NET` plutôt qu’une logique métier reconstruite dans un workflow `n8n`.
 
 ## Documentation
 
@@ -34,6 +36,7 @@
 - Toute nouvelle variable d’environnement utilisée doit être déclarée dans [`.env.example`](./.env.example).
 - Toute nouvelle variable conservée en réserve doit être explicitement signalée comme non branchée si elle n’est pas consommée par la stack.
 - Toute nouvelle couche `.NET` doit être documentée avec son rôle exact dans l’architecture globale.
+- Si un workflow `n8n` dépend encore d’un script transitoire, le fallback doit être assumé et documenté.
 
 ## Validation
 

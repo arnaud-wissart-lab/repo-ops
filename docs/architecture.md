@@ -1,46 +1,59 @@
 # Architecture cible
 
-`repo-ops` fournit un socle centralisé pour piloter la maintenance de plusieurs dépôts GitHub publics personnels sans couplage fort avec chacun d’eux. Le dépôt est désormais centré sur une couche métier `.NET`, tout en conservant `Docker Compose` comme base d’exécution réelle et `Aspire` comme couche locale de pilotage.
+`repo-ops` fournit un socle centralisé pour piloter la maintenance de plusieurs dépôts GitHub publics personnels sans couplage fort avec chacun d’eux. Le dépôt est centré sur une couche métier `.NET`, conserve `Docker Compose` comme base d’exécution réelle et utilise `Aspire` comme couche locale de pilotage.
 
 ## Principes directeurs
 
 - `Docker Compose` reste la référence d’exécution locale réelle du socle.
 - `Aspire` sert au pilotage local, à la visualisation et au confort de développement.
-- le worker `.NET` devient progressivement la couche métier principale ;
-- `n8n` reste utile pour les cron, les enchaînements simples et les notifications ;
+- le worker `.NET` devient la source de vérité du reporting ;
+- `n8n` reste utile pour les cron, les déclenchements simples et les notifications ;
 - `Renovate` reste la brique dédiée à la maintenance automatisée des dépendances ;
-- les scripts existants sont maintenus comme solution transitoire, pas comme cible architecturale.
+- les scripts existants sont maintenus hors du flux réel principal.
+
+## Flux réel retenu
+
+1. `n8n` déclenche un workflow quotidien.
+2. Le workflow écrit un fichier de trigger partagé.
+3. Le worker `.NET`, maintenu en veille légère, détecte ce trigger.
+4. Le worker produit les artefacts de sortie :
+   - JSON stable
+   - texte
+   - HTML
+5. `n8n` lit le JSON frais du worker après purge des anciens artefacts.
+6. `n8n` envoie l’email à partir du digest déjà produit.
 
 ## Rôles des composants
 
 ### Docker Compose
 
-[`docker-compose.yml`](../docker-compose.yml) exécute la stack réellement prévue pour le socle :
+[`docker-compose.yml`](../docker-compose.yml) exécute la stack réellement prévue pour le socle.
+
+Par défaut :
 
 - `worker` ;
 - `postgres` ;
-- `n8n` ;
-- `renovate`.
+- `n8n`.
 
-Cette couche doit rester simple, robuste et directement exploitable sans dépendance à Visual Studio.
+`Renovate` est conservé dans le même fichier, mais derrière un profil explicite de maintenance.
 
 ### Worker .NET
 
-[`src/RepoOps.Worker`](../src/RepoOps.Worker) porte la future logique métier :
+[`src/RepoOps.Worker`](../src/RepoOps.Worker) porte la logique métier :
 
-- collecte des résultats ;
-- consolidation ;
-- génération de synthèse ;
-- future base pour une logique de supervision plus avancée.
+- construction du rapport ;
+- rendu du digest ;
+- persistance des sorties ;
+- mode `run once` exploitable localement ;
+- détection d’un trigger simple dans `runtime/`.
 
 Dans l’état actuel, le worker :
 
-- journalise des cycles d’exécution ;
 - lit `RENOVATE_REPOSITORIES` ;
-- produit un rapport placeholder structuré ;
-- écrit une synthèse texte locale dans `reports/`.
-
-Il ne simule pas de branchement GitHub réel et ne prétend pas piloter déjà des dépôts tiers.
+- produit un rapport JSON placeholder structuré ;
+- sépare les modèles métier, le rendu du digest et la persistance ;
+- génère un sujet, un texte brut et un HTML simples ;
+- peut émettre le JSON sur `stdout` en mode explicite.
 
 ### Aspire AppHost
 
@@ -52,84 +65,81 @@ L’AppHost permet de visualiser localement :
 - `postgres` ;
 - `n8n`.
 
-Choix volontaire : `Renovate` reste principalement attaché à la stack `Docker Compose`. Cela évite d’alourdir inutilement l’AppHost alors que son rôle est d’abord local et exploratoire.
+Choix volontaire dans ce lot : `Renovate` reste hors AppHost. La maintenance explicite continue de relever de `Docker Compose`.
 
 ### Renovate
 
-`Renovate` self-hosted détecte les dépendances obsolètes ou vulnérables puis ouvre des pull requests de maintenance sur une allowlist explicite de dépôts. L’autodiscovery globale reste désactivée pour garder la maîtrise du périmètre.
+`Renovate` self-hosted détecte les dépendances obsolètes ou vulnérables puis ouvre des pull requests de maintenance sur une allowlist explicite de dépôts.
+
+Dans ce lot :
+
+- il ne tourne plus en boucle infinie ;
+- il est déclenché explicitement ;
+- il reste attaché au runtime Compose.
 
 ### n8n
 
 `n8n` orchestre :
 
 - les déclenchements planifiés ;
-- les enchaînements simples ;
-- l’import de workflows versionnés ;
+- le déclenchement simple du worker via un fichier partagé ;
+- la lecture du rapport produit ;
 - l’envoi des notifications par email.
 
-Le workflow quotidien versionné suit encore une chaîne de transition :
-
-- `Cron` quotidien ;
-- préparation du contexte ;
-- appel d’un script local ;
-- mise en forme d’une synthèse ;
-- envoi d’un email.
+Le workflow versionné ne reconstruit plus la synthèse métier. Il se contente de consommer le digest du worker et de l’envoyer.
 
 ### Scripts transitoires
 
-Les scripts du dossier `scripts/` restent présents pour préserver la compatibilité avec le workflow `n8n` existant. Ils servent de passerelle temporaire entre l’orchestration JSON et la future logique portée par le worker `.NET`.
+Les scripts du dossier `scripts/` restent présents comme utilitaires transitoires, mais ne font plus partie du flux réel retenu pour le reporting quotidien.
 
-Leur rôle doit décroître progressivement au profit de services `.NET` explicites.
+## Exécution explicite de Renovate
 
-### Templates d’email
+Commande recommandée :
 
-Les templates HTML et texte brut définissent un format de synthèse homogène, réutilisable par `n8n` aujourd’hui et plus tard par la couche `.NET` si l’envoi ou la préparation du contenu migre.
+```powershell
+docker compose --profile maintenance run --rm renovate
+```
+
+Commande minimale de validation :
+
+```powershell
+docker compose --profile maintenance run --rm renovate --version
+```
 
 ## Répartition des responsabilités
 
 ### Ce qui relève de Docker Compose
 
 - exécuter réellement les services locaux ;
-- conserver une base simple et scriptable ;
+- distinguer la stack principale et les tâches de maintenance explicites ;
 - rester indépendant de l’IDE.
 
 ### Ce qui relève d’Aspire
 
 - visualiser les ressources en local ;
 - faciliter le démarrage et l’observation dans Visual Studio ;
-- accélérer le développement autour de la couche `.NET`.
+- garder une expérience de développement cohérente autour de la couche `.NET`.
 
 ### Ce qui relève du Worker .NET
 
 - porter la logique métier de collecte, consolidation et synthèse ;
-- remplacer progressivement les placeholders shell et PowerShell ;
-- préparer l’extension future vers un superviseur plus avancé.
+- produire le contrat de sortie de référence ;
+- fournir les artefacts consommés par `n8n`.
 
 ### Ce qui relève encore de n8n
 
 - les `Cron` ;
-- les enchaînements simples ;
-- les notifications ;
-- l’import et l’édition manuelle de workflows côté instance locale.
+- le déclenchement simple du worker ;
+- l’envoi de l’email ;
+- la configuration manuelle des credentials SMTP.
 
-## Futur superviseur IA
+## Limites actuelles
 
-Le superviseur IA reste une extension future du socle. Il devra se brancher sur la couche `.NET`, pas court-circuiter les fondations existantes.
-
-Rôle visé :
-
-- planifier des tâches incrémentales ;
-- déléguer l’implémentation ;
-- déclencher ou vérifier les validations ;
-- produire une synthèse claire et bornée ;
-- préparer une PR sans contourner les règles locales.
-
-Contraintes à préserver :
-
-- respect des instructions projet de type `AGENTS.md` ;
-- absence de secret en dur ;
-- absence d’action non réversible sans politique explicite ;
-- séparation claire entre orchestration, implémentation, validation et reporting.
+- le worker produit encore un contenu placeholder ;
+- le déclenchement repose sur un fichier partagé simple ;
+- le worker reste pour l'instant en veille par scrutation légère ;
+- aucune intégration GitHub réelle n’est branchée à ce stade ;
+- `Renovate` n’est pas encore intégré à une planification de maintenance dédiée dans le dépôt.
 
 ## Diagramme
 
@@ -138,19 +148,15 @@ flowchart LR
     Compose["Docker Compose"] --> Worker["Worker .NET"]
     Compose --> Postgres["PostgreSQL"]
     Compose --> N8N["n8n"]
-    Compose --> Renovate["Renovate"]
+    Compose -. maintenance explicite .-> Renovate["Renovate"]
+    N8N --> Trigger["Fichier de déclenchement"]
+    Trigger --> Worker
+    Worker --> Reports["JSON + TXT + HTML"]
+    N8N --> Reports
+    N8N --> Mail["Email SMTP"]
     Renovate --> GitHub["Dépôts GitHub en allowlist"]
     GitHub --> CI["CI GitHub"]
-    N8N --> Scripts["Scripts transitoires"]
-    Scripts --> Worker
-    Worker --> Reports["Rapports et synthèses"]
-    Templates["Templates HTML/TXT"] --> Reports
     Aspire["Aspire AppHost"] -. pilotage local .-> Worker
     Aspire -. visualisation locale .-> Postgres
     Aspire -. visualisation locale .-> N8N
-    Reports -. extension future .-> Supervisor["Superviseur IA"]
-    Supervisor --> Planner["Planification"]
-    Planner --> Implementer["Implémentation"]
-    Implementer --> Validation["Validation"]
-    Validation --> Reporter["Synthèse et préparation de PR"]
 ```

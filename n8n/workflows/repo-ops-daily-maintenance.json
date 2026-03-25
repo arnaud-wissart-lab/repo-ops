@@ -6,7 +6,7 @@
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
-        240,
+        220,
         180
       ],
       "id": "1f5f95ab-0a54-40c3-9d11-2bc1f9f9b201",
@@ -27,7 +27,7 @@
       "type": "n8n-nodes-base.cron",
       "typeVersion": 1,
       "position": [
-        240,
+        220,
         360
       ],
       "id": "9e83ab04-8cd2-4378-8bc1-dfd839ca7e18",
@@ -35,12 +35,12 @@
     },
     {
       "parameters": {
-        "jsCode": "const now = new Date();\nconst runDateDisplay = new Intl.DateTimeFormat(\"fr-FR\", {\n  dateStyle: \"full\",\n  timeStyle: \"short\",\n  timeZone: \"Europe/Paris\",\n}).format(now);\n\nreturn [\n  {\n    json: {\n      workflowName: \"repo-ops - maintenance quotidienne\",\n      runDateIso: now.toISOString(),\n      runDateDisplay,\n      collectCommand: \"sh /files/scripts/collect-results.sh --execute --format json\",\n      mailFrom: \"Repo Ops <a-configurer@example.com>\",\n      mailTo: \"a-configurer@example.com\",\n      workflowNotes: [\n        \"Configurer un credential SMTP sur le nœud Email Send après import.\",\n        \"Remplacer les adresses placeholder dans ce nœud avant activation.\"\n      ],\n      logMessages: [\n        \"[workflow] Contexte d'exécution préparé.\",\n        \"[workflow] Le script de collecte sera exécuté dans le conteneur n8n.\"\n      ]\n    }\n  }\n];"
+        "jsCode": "const now = new Date();\nconst runDateDisplay = new Intl.DateTimeFormat(\"fr-FR\", {\n  dateStyle: \"full\",\n  timeStyle: \"short\",\n  timeZone: \"Europe/Paris\",\n}).format(now);\n\nreturn [\n  {\n    json: {\n      workflowName: \"repo-ops - maintenance quotidienne\",\n      runDateIso: now.toISOString(),\n      runDateDisplay,\n      triggerCommand: \"sh -lc \\\"mkdir -p /files/runtime /files/reports && rm -f /files/reports/worker-summary.json /files/reports/worker-summary.txt /files/reports/worker-summary.html && date -u +%Y-%m-%dT%H:%M:%SZ > /files/runtime/daily-maintenance.trigger\\\"\",\n      readReportCommand: \"sh -lc \\\"for i in $(seq 1 30); do if [ -s /files/reports/worker-summary.json ]; then cat /files/reports/worker-summary.json; exit 0; fi; sleep 2; done; echo 'Rapport du worker indisponible.' >&2; exit 1\\\"\",\n      mailFrom: \"__CONFIGURER_FROM_DANS_N8N__\",\n      mailTo: \"__CONFIGURER_TO_DANS_N8N__\",\n      workflowNotes: [\n        \"Le workflow déclenche le worker .NET via un fichier partagé.\",\n        \"Le rapport précédent est supprimé avant chaque trigger pour éviter la lecture d'une sortie obsolète.\",\n        \"Remplacer les marqueurs __CONFIGURER_*__ et associer un credential SMTP avant activation.\"\n      ],\n      workflowLogs: [\n        \"[workflow] Contexte d'exécution préparé.\",\n        \"[workflow] Le worker est déclenché via un fichier partagé dans /files/runtime.\",\n        \"[workflow] n8n attend ensuite un rapport JSON frais produit par le worker.\"\n      ]\n    }\n  }\n];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        520,
+        500,
         270
       ],
       "id": "3f6fb758-4fef-4b22-a3f6-c983baf0d1d4",
@@ -49,29 +49,43 @@
     {
       "parameters": {
         "executeOnce": true,
-        "command": "={{ $json.collectCommand }}"
+        "command": "={{ $json.triggerCommand }}"
       },
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
       "position": [
-        800,
+        760,
         270
       ],
       "id": "063bc172-c84e-4f6c-ac5e-49fdd5d31a27",
-      "name": "Collecter les résultats"
+      "name": "Déclencher le worker"
     },
     {
       "parameters": {
-        "jsCode": "const result = $input.first().json;\nconst stdout = result.stdout ?? \"{}\";\nlet report;\n\ntry {\n  report = JSON.parse(stdout);\n} catch (error) {\n  throw new Error(`Impossible d'analyser la sortie JSON de collect-results : ${error.message}`);\n}\n\nreturn [\n  {\n    json: {\n      report,\n      collectExitCode: result.exitCode ?? 0,\n      collectStdout: result.stdout ?? \"\",\n      collectStderr: result.stderr ?? \"\",\n      logMessages: report.logMessages ?? []\n    }\n  }\n];"
+        "executeOnce": true,
+        "command": "={{ $json.readReportCommand }}"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1020,
+        270
+      ],
+      "id": "a4e09bca-28f8-4c73-a7d4-0b13ab2e2fc2",
+      "name": "Lire le rapport du worker"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst stdout = data.stdout ?? \"{}\";\nlet report;\n\ntry {\n  report = JSON.parse(stdout);\n} catch (error) {\n  throw new Error(`Impossible d'analyser la sortie JSON du worker : ${error.message}`);\n}\n\nreturn [\n  {\n    json: {\n      report,\n      reportExitCode: data.exitCode ?? 0,\n      reportStdout: data.stdout ?? \"\",\n      reportStderr: data.stderr ?? \"\"\n    }\n  }\n];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1060,
+        1280,
         270
       ],
       "id": "4bb0b39f-e098-46ad-a932-0dd3ea767fb0",
-      "name": "Analyser les résultats"
+      "name": "Analyser le rapport"
     },
     {
       "parameters": {
@@ -82,7 +96,7 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        1300,
+        1520,
         270
       ],
       "id": "d0fd4d0d-cd48-4d93-92fe-ff81f367ec3c",
@@ -90,16 +104,16 @@
     },
     {
       "parameters": {
-        "jsCode": "const data = $input.first().json;\nconst report = data.report ?? {};\nconst scanned = report.scannedRepositories ?? [];\nconst created = report.createdPullRequests ?? [];\nconst merged = report.mergedPullRequests ?? [];\nconst failed = report.failedPullRequests ?? [];\nconst vulnerabilities = report.remainingVulnerabilities ?? [];\nconst actions = report.manualActions ?? [];\nconst logs = [...(data.logMessages ?? []), ...(report.logMessages ?? [])];\n\nconst escapeHtml = (value) => String(value)\n  .replace(/&/g, \"&amp;\")\n  .replace(/</g, \"&lt;\")\n  .replace(/>/g, \"&gt;\")\n  .replace(/\\\"/g, \"&quot;\")\n  .replace(/'/g, \"&#39;\");\n\nconst asTextLines = (values, fallback) =>\n  values.length > 0\n    ? values.map((value) => `- ${typeof value === \"string\" ? value : JSON.stringify(value)}`).join(\"\\n\")\n    : `- ${fallback}`;\n\nconst asHtmlList = (values, fallback) =>\n  values.length > 0\n    ? `<ul>${values\n        .map((value) => `<li>${escapeHtml(typeof value === \"string\" ? value : JSON.stringify(value))}</li>`)\n        .join(\"\")}</ul>`\n    : `<p>${escapeHtml(fallback)}</p>`;\n\nconst subject = `[repo-ops] Synthèse maintenance du ${data.runDateDisplay}`;\n\nconst text = [\n  `Synthèse quotidienne repo-ops`,\n  `Date d'exécution : ${data.runDateDisplay}`,\n  \"\",\n  \"Dépôts scannés\",\n  asTextLines(scanned, \"Aucun dépôt remonté par le placeholder.\"),\n  \"\",\n  \"PR créées\",\n  asTextLines(created, \"Aucune PR créée dans ce premier jet.\"),\n  \"\",\n  \"PR fusionnées\",\n  asTextLines(merged, \"Aucune PR fusionnée dans ce premier jet.\"),\n  \"\",\n  \"PR en échec\",\n  asTextLines(failed, \"Aucune PR en échec dans ce premier jet.\"),\n  \"\",\n  \"Vulnérabilités restantes\",\n  asTextLines(vulnerabilities, \"Aucune vulnérabilité remontée par le placeholder.\"),\n  \"\",\n  \"Actions manuelles recommandées\",\n  asTextLines(actions, \"Aucune action manuelle supplémentaire.\"),\n  \"\",\n  \"Journal d'exécution\",\n  asTextLines(logs, \"Aucun log supplémentaire.\")\n].join(\"\\n\");\n\nconst html = `\n  <html lang=\"fr\">\n    <body style=\"font-family: Arial, sans-serif; color: #172033; line-height: 1.5;\">\n      <h1>Synthèse quotidienne repo-ops</h1>\n      <p><strong>Date d'exécution :</strong> ${escapeHtml(data.runDateDisplay)}</p>\n      <h2>Dépôts scannés</h2>\n      ${asHtmlList(scanned, \"Aucun dépôt remonté par le placeholder.\")}\n      <h2>PR créées</h2>\n      ${asHtmlList(created, \"Aucune PR créée dans ce premier jet.\")}\n      <h2>PR fusionnées</h2>\n      ${asHtmlList(merged, \"Aucune PR fusionnée dans ce premier jet.\")}\n      <h2>PR en échec</h2>\n      ${asHtmlList(failed, \"Aucune PR en échec dans ce premier jet.\")}\n      <h2>Vulnérabilités restantes</h2>\n      ${asHtmlList(vulnerabilities, \"Aucune vulnérabilité remontée par le placeholder.\")}\n      <h2>Actions manuelles recommandées</h2>\n      ${asHtmlList(actions, \"Aucune action manuelle supplémentaire.\")}\n      <h2>Journal d'exécution</h2>\n      ${asHtmlList(logs, \"Aucun log supplémentaire.\")}\n    </body>\n  </html>\n`;\n\nreturn [\n  {\n    json: {\n      ...data,\n      emailSubject: subject,\n      emailText: text,\n      emailHtml: html,\n      executionLog: logs.join(\"\\n\")\n    }\n  }\n];"
+        "jsCode": "const data = $input.first().json;\nconst report = data.report ?? {};\nconst digest = report.digest ?? {};\n\nreturn [\n  {\n    json: {\n      ...data,\n      emailSubject: digest.subject ?? `[repo-ops] Synthèse maintenance du ${data.runDateDisplay}`,\n      emailText: digest.plainTextBody ?? \"Synthèse indisponible.\",\n      emailHtml: digest.htmlBody ?? \"<html lang=\\\"fr\\\"><body><p>Synthèse indisponible.</p></body></html>\"\n    }\n  }\n];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1560,
+        1760,
         270
       ],
       "id": "37939d50-9277-4bb5-a151-410d4696f577",
-      "name": "Générer la synthèse"
+      "name": "Préparer l'email"
     },
     {
       "parameters": {
@@ -114,7 +128,7 @@
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
       "position": [
-        1820,
+        2000,
         270
       ],
       "id": "b3662d88-5efd-41f0-a984-a65c52532eb7",
@@ -150,7 +164,7 @@
       "main": [
         [
           {
-            "node": "Collecter les résultats",
+            "node": "Déclencher le worker",
             "type": "main",
             "index": 0
           },
@@ -162,18 +176,29 @@
         ]
       ]
     },
-    "Collecter les résultats": {
+    "Déclencher le worker": {
       "main": [
         [
           {
-            "node": "Analyser les résultats",
+            "node": "Lire le rapport du worker",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Analyser les résultats": {
+    "Lire le rapport du worker": {
+      "main": [
+        [
+          {
+            "node": "Analyser le rapport",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyser le rapport": {
       "main": [
         [
           {
@@ -188,14 +213,14 @@
       "main": [
         [
           {
-            "node": "Générer la synthèse",
+            "node": "Préparer l'email",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Générer la synthèse": {
+    "Préparer l'email": {
       "main": [
         [
           {

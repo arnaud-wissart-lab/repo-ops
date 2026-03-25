@@ -9,23 +9,23 @@ services:
       LOG_LEVEL: ${LOG_LEVEL}
       RENOVATE_REPOSITORIES: ${RENOVATE_REPOSITORIES}
       RepoOps__Worker__ContinuousModeEnabled: "true"
+      RepoOps__Worker__RunOnStartup: "false"
       RepoOps__Worker__LoopIntervalSeconds: ${WORKER_LOOP_INTERVAL_SECONDS}
       RepoOps__Worker__InputSource: docker-compose
+      RepoOps__Worker__EmitJsonToStdout: "false"
       RepoOps__Worker__ReportOutputPath: ${WORKER_REPORT_OUTPUT_PATH}
       RepoOps__Worker__SummaryTextOutputPath: ${WORKER_SUMMARY_TEXT_OUTPUT_PATH}
+      RepoOps__Worker__SummaryHtmlOutputPath: ${WORKER_SUMMARY_HTML_OUTPUT_PATH}
+      RepoOps__Worker__TriggerFilePath: ${WORKER_TRIGGER_FILE_PATH}
     volumes:
       - ./reports:/app/reports
-      - ./templates:/app/files/templates:ro
-      - ./scripts:/app/files/scripts:ro
+      - ./runtime:/app/runtime
     healthcheck:
-      test: ["CMD-SHELL", "test -f /app/reports/worker-summary.json"]
+      test: ["CMD-SHELL", "grep -aq 'RepoOps.Worker.dll' /proc/1/cmdline"]
       interval: 30s
       timeout: 5s
       retries: 5
       start_period: 30s
-    depends_on:
-      postgres:
-        condition: service_healthy
     networks:
       - repo-ops
 
@@ -83,8 +83,8 @@ services:
     volumes:
       - n8n-data:/home/node/.n8n
       - ./n8n/workflows:/files/workflows
-      - ./scripts:/files/scripts:ro
-      - ./templates:/files/templates:ro
+      - ./reports:/files/reports:ro
+      - ./runtime:/files/runtime
     healthcheck:
       test:
         - CMD-SHELL
@@ -103,7 +103,9 @@ services:
 
   renovate:
     image: renovate/renovate:39
-    restart: unless-stopped
+    profiles:
+      - maintenance
+    restart: "no"
     environment:
       LOG_LEVEL: ${LOG_LEVEL}
       RENOVATE_CONFIG_FILE: /usr/src/app/config.js
@@ -113,15 +115,6 @@ services:
       RENOVATE_DRY_RUN: ${RENOVATE_DRY_RUN}
       RENOVATE_REPOSITORIES: ${RENOVATE_REPOSITORIES}
       TZ: ${TZ}
-    command:
-      - /bin/sh
-      - -lc
-      - |
-        echo "Renovate démarre en mode planifié"
-        while true; do
-          renovate
-          sleep "${RENOVATE_INTERVAL_SECONDS:-86400}"
-        done
     volumes:
       - ./renovate/config.js:/usr/src/app/config.js:ro
       - renovate-data:/var/renovate

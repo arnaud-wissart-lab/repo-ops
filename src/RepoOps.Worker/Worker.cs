@@ -7,6 +7,7 @@ namespace RepoOps.Worker;
 public sealed class Worker(
     ILogger<Worker> logger,
     MaintenanceWorkflowService workflowService,
+    MaintenanceTriggerService triggerService,
     IOptions<RepoOpsWorkerOptions> options,
     IHostApplicationLifetime applicationLifetime) : BackgroundService
 {
@@ -16,12 +17,26 @@ public sealed class Worker(
         var iteration = 0;
 
         logger.LogInformation(
-            "Le worker repo-ops démarre en mode {Mode} avec un intervalle de {IntervalSeconds} seconde(s)",
+            "Le worker repo-ops démarre en mode {Mode}, avec un intervalle de {IntervalSeconds} seconde(s) et un fichier de déclenchement {TriggerFilePath}",
             settings.ContinuousModeEnabled ? "continu" : "exécution unique",
-            settings.LoopIntervalSeconds);
+            settings.LoopIntervalSeconds,
+            settings.TriggerFilePath);
 
         while (!stoppingToken.IsCancellationRequested)
         {
+            var shouldRun = !settings.ContinuousModeEnabled
+                || (iteration == 0 && settings.RunOnStartup)
+                || triggerService.TryConsumeTrigger();
+
+            if (!shouldRun)
+            {
+                logger.LogDebug("Aucun déclenchement détecté, attente du prochain cycle");
+                await Task.Delay(
+                    TimeSpan.FromSeconds(settings.LoopIntervalSeconds),
+                    stoppingToken);
+                continue;
+            }
+
             iteration++;
 
             logger.LogInformation("Démarrage du cycle {Iteration}", iteration);

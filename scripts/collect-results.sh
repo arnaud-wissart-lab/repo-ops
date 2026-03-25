@@ -72,6 +72,7 @@ SCANNED_REPOSITORIES_JSON="$(to_json_array "$REPOSITORIES_CSV")"
 
 log "Placeholder actif"
 log "Ce script reste une passerelle transitoire le temps que la logique métier migre vers le worker .NET"
+log "Le workflow n8n lit désormais en priorité le rapport JSON produit par le worker"
 log "Source attendue plus tard : journaux Renovate, états de PR GitHub et résultats de CI"
 log "Source d'entrée actuelle : ${INPUT_SOURCE}"
 

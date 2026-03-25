@@ -33,8 +33,6 @@ module.exports = {
     "after 1am and before 5am every weekday",
     "every weekend"
   ],
-  logLevel: process.env.LOG_LEVEL || "info",
-  logFormat: "json",
   packageRules: [
     {
       description: "Cadre commun pour les mises à jour applicatives détectées.",

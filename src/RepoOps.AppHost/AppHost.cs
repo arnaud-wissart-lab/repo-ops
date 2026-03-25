@@ -7,15 +7,21 @@ var postgresUser = configuration["POSTGRES_USER"] ?? "n8n";
 var n8nPort = int.TryParse(configuration["N8N_PORT"], out var parsedN8nPort) ? parsedN8nPort : 5678;
 var n8nProtocol = configuration["N8N_PROTOCOL"] ?? "http";
 var n8nHost = configuration["N8N_HOST"] ?? "localhost";
+var hasPostgresPassword = !string.IsNullOrWhiteSpace(configuration["POSTGRES_PASSWORD"]);
+var hasN8nEncryptionKey = !string.IsNullOrWhiteSpace(configuration["N8N_ENCRYPTION_KEY"]);
 
-var postgresPassword = builder.AddParameter(
-    "postgres-password",
-    configuration["POSTGRES_PASSWORD"] ?? "changez-moi",
-    secret: true);
-var n8nEncryptionKey = builder.AddParameter(
-    "n8n-encryption-key",
-    configuration["N8N_ENCRYPTION_KEY"] ?? "changez-moi",
-    secret: true);
+var postgresPassword = !hasPostgresPassword
+    ? builder.AddParameter("postgres-password", secret: true)
+    : builder.AddParameter("postgres-password", configuration["POSTGRES_PASSWORD"]!, secret: true);
+var n8nEncryptionKey = !hasN8nEncryptionKey
+    ? builder.AddParameter("n8n-encryption-key", secret: true)
+    : builder.AddParameter("n8n-encryption-key", configuration["N8N_ENCRYPTION_KEY"]!, secret: true);
+
+if (!hasPostgresPassword || !hasN8nEncryptionKey)
+{
+    Console.WriteLine("Des secrets requis ne sont pas fournis dans l'environnement.");
+    Console.WriteLine("Configurer POSTGRES_PASSWORD et N8N_ENCRYPTION_KEY via user-secrets ou via le tableau de bord Aspire.");
+}
 
 var postgres = builder.AddContainer("postgres", "postgres", "16-alpine")
     .WithEnvironment("TZ", timeZone)
@@ -29,7 +35,8 @@ var worker = builder.AddProject<Projects.RepoOps_Worker>("worker")
     .WithEnvironment("LOG_LEVEL", configuration["LOG_LEVEL"] ?? "info")
     .WithEnvironment("RENOVATE_REPOSITORIES", configuration["RENOVATE_REPOSITORIES"] ?? string.Empty)
     .WithEnvironment("RepoOps__Worker__InputSource", "aspire-apphost")
-    .WithEnvironment("RepoOps__Worker__ContinuousModeEnabled", "false");
+    .WithEnvironment("RepoOps__Worker__ContinuousModeEnabled", "false")
+    .WithEnvironment("RepoOps__Worker__EmitJsonToStdout", "true");
 
 var n8n = builder.AddContainer("n8n", "docker.n8n.io/n8nio/n8n", "1")
     .WithEnvironment("TZ", timeZone)
@@ -49,7 +56,9 @@ var n8n = builder.AddContainer("n8n", "docker.n8n.io/n8nio/n8n", "1")
     .WithEnvironment("RENOVATE_REPOSITORIES", configuration["RENOVATE_REPOSITORIES"] ?? string.Empty)
     .WithHttpEndpoint(port: n8nPort, targetPort: n8nPort, name: "http");
 
-worker.WaitFor(postgres);
 n8n.WaitFor(postgres);
+
+// Renovate reste volontairement hors AppHost dans ce lot.
+// Le runtime Compose conserve la responsabilité de son déclenchement explicite.
 
 builder.Build().Run();

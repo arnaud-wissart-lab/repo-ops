@@ -33,6 +33,7 @@ $logMessages = @(
 
 [Console]::Error.WriteLine("[collect-results] Placeholder actif")
 [Console]::Error.WriteLine("[collect-results] Ce script reste une passerelle transitoire le temps que la logique métier migre vers le worker .NET")
+[Console]::Error.WriteLine("[collect-results] Le workflow n8n lit désormais en priorité le rapport JSON produit par le worker")
 [Console]::Error.WriteLine("[collect-results] Source attendue plus tard : journaux Renovate, états de PR GitHub et résultats de CI")
 [Console]::Error.WriteLine("[collect-results] Source d'entrée actuelle : $InputSource")
 

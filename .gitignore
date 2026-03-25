@@ -42,12 +42,12 @@ n8n/backups/
 
 # Sorties de scripts et rapports
 reports/
-runtime/
 artifacts/
 exports/
 out/
 *.tmp
 *.bak
+.codex-temp/
 
 # Fichiers système
 .DS_Store

@@ -5,6 +5,7 @@ var timeZone = configuration["TZ"] ?? "Europe/Paris";
 var postgresDatabase = configuration["POSTGRES_DB"] ?? "n8n";
 var postgresUser = configuration["POSTGRES_USER"] ?? "n8n";
 var n8nPort = int.TryParse(configuration["N8N_PORT"], out var parsedN8nPort) ? parsedN8nPort : 5678;
+var workerPort = int.TryParse(configuration["WORKER_HTTP_PORT"], out var parsedWorkerPort) ? parsedWorkerPort : 8080;
 var n8nProtocol = configuration["N8N_PROTOCOL"] ?? "http";
 var n8nHost = configuration["N8N_HOST"] ?? "localhost";
 var hasPostgresPassword = !string.IsNullOrWhiteSpace(configuration["POSTGRES_PASSWORD"]);
@@ -43,9 +44,12 @@ var worker = builder.AddProject<Projects.RepoOps_Worker>("worker")
     .WithEnvironment("AUTOMERGE_ALLOWED_MERGEABLE_STATES", configuration["AUTOMERGE_ALLOWED_MERGEABLE_STATES"] ?? "clean")
     .WithEnvironment("AUTOMERGE_MERGE_METHOD", configuration["AUTOMERGE_MERGE_METHOD"] ?? "squash")
     .WithEnvironment("AUTOMERGE_POLICY_FILE_PATH", configuration["AUTOMERGE_POLICY_FILE_PATH"] ?? string.Empty)
+    .WithEnvironment("WORKER_HTTP_PORT", workerPort.ToString())
+    .WithEnvironment("RepoOps__Worker__HttpPort", workerPort.ToString())
+    .WithEnvironment("RepoOps__Worker__ExecutionTimeoutSeconds", configuration["WORKER_EXECUTION_TIMEOUT_SECONDS"] ?? "1800")
     .WithEnvironment("RepoOps__Worker__InputSource", "aspire-apphost")
-    .WithEnvironment("RepoOps__Worker__ContinuousModeEnabled", "false")
-    .WithEnvironment("RepoOps__Worker__EmitJsonToStdout", "true");
+    .WithEnvironment("RepoOps__Worker__EmitJsonToStdout", "false")
+    .WithHttpEndpoint(port: workerPort, targetPort: workerPort, name: "http");
 
 var n8n = builder.AddContainer("n8n", "docker.n8n.io/n8nio/n8n", "1")
     .WithEnvironment("TZ", timeZone)

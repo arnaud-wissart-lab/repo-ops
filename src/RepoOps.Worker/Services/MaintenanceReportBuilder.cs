@@ -6,19 +6,17 @@ namespace RepoOps.Worker.Services;
 
 public sealed class MaintenanceReportBuilder(
     IConfiguration configuration,
-    IOptions<RepoOpsWorkerOptions> workerOptions,
     GitHubMaintenanceCollector gitHubMaintenanceCollector,
     RenovateExecutionService renovateExecutionService,
     ILogger<MaintenanceReportBuilder> logger)
 {
     public async Task<MaintenanceRunReport> BuildAsync(
-        string inputSource,
+        MaintenanceRunRequest request,
         CancellationToken cancellationToken)
     {
-        var settings = workerOptions.Value;
         var repositories = ResolveRepositories(configuration["RENOVATE_REPOSITORIES"]);
         var renovateExecution = await renovateExecutionService.ResolveAsync(
-            settings.TriggerRenovateExecution,
+            request.TriggerRenovateExecution,
             cancellationToken);
         var collectionResult = await gitHubMaintenanceCollector.CollectAsync(repositories, cancellationToken);
 
@@ -62,10 +60,10 @@ public sealed class MaintenanceReportBuilder(
             Summary = new MaintenanceExecutionSummary
             {
                 Status = globalStatus,
-                Mode = settings.TriggerRenovateExecution
+                Mode = request.TriggerRenovateExecution
                     ? "maintenance-with-explicit-renovate"
                     : "daily-maintenance",
-                InputSource = inputSource,
+                InputSource = request.InputSource,
                 RunDateUtc = DateTimeOffset.UtcNow,
                 ScannedRepositories = collectionResult.ScannedRepositories,
                 CreatedPullRequests = collectionResult.CreatedPullRequests,

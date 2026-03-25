@@ -4,11 +4,9 @@ public sealed class RepoOpsWorkerOptions
 {
     public const string SectionName = "RepoOps:Worker";
 
-    public bool ContinuousModeEnabled { get; set; } = true;
+    public int HttpPort { get; set; } = 8080;
 
-    public bool RunOnStartup { get; set; } = true;
-
-    public int LoopIntervalSeconds { get; set; } = 30;
+    public int ExecutionTimeoutSeconds { get; set; } = 1800;
 
     public string InputSource { get; set; } = "worker-dotnet";
 
@@ -21,6 +19,4 @@ public sealed class RepoOpsWorkerOptions
     public string SummaryTextOutputPath { get; set; } = "reports/worker-summary.txt";
 
     public string SummaryHtmlOutputPath { get; set; } = "reports/worker-summary.html";
-
-    public string TriggerFilePath { get; set; } = "runtime/daily-maintenance.trigger";
 }

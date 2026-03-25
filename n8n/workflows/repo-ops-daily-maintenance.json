@@ -35,7 +35,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const now = new Date();\nconst runDateDisplay = new Intl.DateTimeFormat(\"fr-FR\", {\n  dateStyle: \"full\",\n  timeStyle: \"short\",\n  timeZone: \"Europe/Paris\",\n}).format(now);\n\nreturn [\n  {\n    json: {\n      workflowName: \"repo-ops - maintenance quotidienne\",\n      runDateIso: now.toISOString(),\n      runDateDisplay,\n      triggerCommand: \"sh -lc \\\"mkdir -p /files/runtime /files/reports && rm -f /files/reports/worker-summary.json /files/reports/worker-summary.txt /files/reports/worker-summary.html && date -u +%Y-%m-%dT%H:%M:%SZ > /files/runtime/daily-maintenance.trigger\\\"\",\n      readReportCommand: \"sh -lc \\\"for i in $(seq 1 30); do if [ -s /files/reports/worker-summary.json ]; then cat /files/reports/worker-summary.json; exit 0; fi; sleep 2; done; echo 'Rapport du worker indisponible.' >&2; exit 1\\\"\",\n      mailFrom: \"__CONFIGURER_FROM_DANS_N8N__\",\n      mailTo: \"__CONFIGURER_TO_DANS_N8N__\",\n      workflowNotes: [\n        \"Le workflow déclenche le worker .NET via un fichier partagé.\",\n        \"Le rapport précédent est supprimé avant chaque trigger pour éviter la lecture d'une sortie obsolète.\",\n        \"Remplacer les marqueurs __CONFIGURER_*__ et associer un credential SMTP avant activation.\"\n      ],\n      workflowLogs: [\n        \"[workflow] Contexte d'exécution préparé.\",\n        \"[workflow] Le worker est déclenché via un fichier partagé dans /files/runtime.\",\n        \"[workflow] n8n attend ensuite un rapport JSON frais produit par le worker.\"\n      ]\n    }\n  }\n];"
+        "jsCode": "const now = new Date();\nconst runDateDisplay = new Intl.DateTimeFormat(\"fr-FR\", {\n  dateStyle: \"full\",\n  timeStyle: \"short\",\n  timeZone: \"Europe/Paris\",\n}).format(now);\n\nconst workerApiUrl = \"http://worker:8080/maintenance/run\";\nconst workerRequestBody = {\n  inputSource: \"n8n-http\",\n  triggerRenovateExecution: false,\n};\n\nreturn [\n  {\n    json: {\n      workflowName: \"repo-ops - maintenance quotidienne\",\n      runDateIso: now.toISOString(),\n      runDateDisplay,\n      workerApiUrl,\n      workerRequestBody,\n      mailFrom: \"__CONFIGURER_FROM_DANS_N8N__\",\n      mailTo: \"__CONFIGURER_TO_DANS_N8N__\",\n      workflowNotes: [\n        \"Le workflow appelle directement l'API HTTP locale du worker .NET.\",\n        \"Le worker retourne le rapport JSON dans la réponse HTTP.\",\n        \"Remplacer les marqueurs __CONFIGURER_*__ et associer un credential SMTP avant activation.\"\n      ],\n      workflowLogs: [\n        \"[workflow] Contexte d'exécution préparé.\",\n        \"[workflow] Le worker est déclenché par HTTP sur le réseau Docker interne.\",\n        \"[workflow] n8n réutilise ensuite le digest déjà produit par le worker.\"\n      ]\n    }\n  }\n];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -48,40 +48,37 @@
     },
     {
       "parameters": {
-        "executeOnce": true,
-        "command": "={{ $json.triggerCommand }}"
+        "method": "POST",
+        "url": "={{ $json.workerApiUrl }}",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={{ JSON.stringify($json.workerRequestBody) }}",
+        "options": {
+          "ignoreResponseCode": true,
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
       },
-      "type": "n8n-nodes-base.executeCommand",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
-        760,
+        780,
         270
       ],
       "id": "063bc172-c84e-4f6c-ac5e-49fdd5d31a27",
-      "name": "Déclencher le worker"
+      "name": "Appeler l'API du worker"
     },
     {
       "parameters": {
-        "executeOnce": true,
-        "command": "={{ $json.readReportCommand }}"
-      },
-      "type": "n8n-nodes-base.executeCommand",
-      "typeVersion": 1,
-      "position": [
-        1020,
-        270
-      ],
-      "id": "a4e09bca-28f8-4c73-a7d4-0b13ab2e2fc2",
-      "name": "Lire le rapport du worker"
-    },
-    {
-      "parameters": {
-        "jsCode": "const data = $input.first().json;\nconst stdout = data.stdout ?? \"{}\";\nlet report;\n\ntry {\n  report = JSON.parse(stdout);\n} catch (error) {\n  throw new Error(`Impossible d'analyser la sortie JSON du worker : ${error.message}`);\n}\n\nreturn [\n  {\n    json: {\n      report,\n      reportExitCode: data.exitCode ?? 0,\n      reportStdout: data.stdout ?? \"\",\n      reportStderr: data.stderr ?? \"\"\n    }\n  }\n];"
+        "jsCode": "const data = $input.first().json;\nconst report = data.body ?? data;\n\nif (!report || typeof report !== \"object\") {\n  throw new Error(\"La réponse HTTP du worker ne contient pas de JSON exploitable.\");\n}\n\nreturn [\n  {\n    json: {\n      report,\n      reportStatusCode: data.statusCode ?? 200,\n      reportHeaders: data.headers ?? {}\n    }\n  }\n];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1280,
+        1040,
         270
       ],
       "id": "4bb0b39f-e098-46ad-a932-0dd3ea767fb0",
@@ -96,7 +93,7 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        1520,
+        1280,
         270
       ],
       "id": "d0fd4d0d-cd48-4d93-92fe-ff81f367ec3c",
@@ -109,7 +106,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1760,
+        1520,
         270
       ],
       "id": "37939d50-9277-4bb5-a151-410d4696f577",
@@ -128,7 +125,7 @@
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
       "position": [
-        2000,
+        1760,
         270
       ],
       "id": "b3662d88-5efd-41f0-a984-a65c52532eb7",
@@ -164,7 +161,7 @@
       "main": [
         [
           {
-            "node": "Déclencher le worker",
+            "node": "Appeler l'API du worker",
             "type": "main",
             "index": 0
           },
@@ -176,18 +173,7 @@
         ]
       ]
     },
-    "Déclencher le worker": {
-      "main": [
-        [
-          {
-            "node": "Lire le rapport du worker",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Lire le rapport du worker": {
+    "Appeler l'API du worker": {
       "main": [
         [
           {

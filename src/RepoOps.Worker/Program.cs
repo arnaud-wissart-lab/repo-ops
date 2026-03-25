@@ -1,12 +1,17 @@
-using RepoOps.Worker;
+using Microsoft.AspNetCore.Http.HttpResults;
 using RepoOps.Worker.Clients;
+using RepoOps.Worker.Models;
 using RepoOps.Worker.Options;
 using RepoOps.Worker.Services;
 
-var builder = Host.CreateApplicationBuilder(ParsePassthroughArguments(args));
+var runOnceRequested = args.Any(arg => string.Equals(arg, "--run-once", StringComparison.OrdinalIgnoreCase));
+var builder = WebApplication.CreateBuilder(ParsePassthroughArguments(args));
+
 builder.Configuration.AddInMemoryCollection(ParseWorkerOverrides(args));
 AddOptionalAutoMergePolicyFile(builder.Configuration);
 builder.Logging.SetMinimumLevel(ResolveLogLevel(builder.Configuration["LOG_LEVEL"]));
+ConfigureWorkerUrls(builder);
+
 builder.Services.Configure<RepoOpsWorkerOptions>(
     builder.Configuration.GetSection(RepoOpsWorkerOptions.SectionName));
 builder.Services.AddOptions<RenovateExecutionOptions>()
@@ -81,12 +86,128 @@ builder.Services.AddSingleton<RenovateExecutionService>();
 builder.Services.AddSingleton<MaintenanceReportBuilder>();
 builder.Services.AddSingleton<MaintenanceDigestRenderer>();
 builder.Services.AddSingleton<MaintenanceReportPersistenceService>();
-builder.Services.AddSingleton<MaintenanceTriggerService>();
 builder.Services.AddSingleton<MaintenanceWorkflowService>();
-builder.Services.AddHostedService<Worker>();
 
-var host = builder.Build();
-host.Run();
+var app = builder.Build();
+
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+app.MapPost("/maintenance/run", RunMaintenanceHttpAsync);
+
+if (runOnceRequested)
+{
+    var request = ResolveCliRequest(app.Configuration);
+    var emitJsonToStdout = app.Configuration.GetValue<bool>($"{RepoOpsWorkerOptions.SectionName}:EmitJsonToStdout");
+
+    try
+    {
+        await RunMaintenanceAsync(
+            app.Services,
+            request,
+            emitJsonToStdout,
+            CancellationToken.None);
+        return;
+    }
+    catch (MaintenanceExecutionTimeoutException exception)
+    {
+        app.Logger.LogError(exception, "Le cycle CLI a dépassé le délai autorisé");
+        Environment.ExitCode = 1;
+        return;
+    }
+    catch (Exception exception)
+    {
+        app.Logger.LogError(exception, "Le cycle CLI a échoué");
+        Environment.ExitCode = 1;
+        return;
+    }
+}
+
+app.Run();
+
+static async Task<Results<JsonHttpResult<MaintenanceRunReport>, ProblemHttpResult>> RunMaintenanceHttpAsync(
+    MaintenanceRunRequest? request,
+    IServiceProvider services,
+    ILogger<Program> logger,
+    CancellationToken cancellationToken)
+{
+    var effectiveRequest = request is null
+        ? new MaintenanceRunRequest()
+        : new MaintenanceRunRequest
+        {
+            InputSource = string.IsNullOrWhiteSpace(request.InputSource) ? "http-api" : request.InputSource,
+            TriggerRenovateExecution = request.TriggerRenovateExecution
+        };
+
+    try
+    {
+        var report = await RunMaintenanceAsync(
+            services,
+            effectiveRequest,
+            emitJsonToStdout: false,
+            cancellationToken);
+
+        var statusCode = report.Summary.Status switch
+        {
+            "Partial" => StatusCodes.Status207MultiStatus,
+            "Failed" => StatusCodes.Status500InternalServerError,
+            _ => StatusCodes.Status200OK
+        };
+
+        return TypedResults.Json(report, statusCode: statusCode);
+    }
+    catch (MaintenanceExecutionTimeoutException exception)
+    {
+        logger.LogError(exception, "Le cycle HTTP a dépassé le délai autorisé");
+
+        return TypedResults.Problem(
+            title: "Délai dépassé",
+            detail: exception.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+    catch (Exception exception)
+    {
+        logger.LogError(exception, "Le cycle HTTP a échoué");
+
+        return TypedResults.Problem(
+            title: "Erreur interne",
+            detail: "Le worker n'a pas pu produire le rapport demandé.",
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+}
+
+static async Task<MaintenanceRunReport> RunMaintenanceAsync(
+    IServiceProvider services,
+    MaintenanceRunRequest request,
+    bool emitJsonToStdout,
+    CancellationToken cancellationToken)
+{
+    await using var scope = services.CreateAsyncScope();
+    var workflowService = scope.ServiceProvider.GetRequiredService<MaintenanceWorkflowService>();
+
+    return await workflowService.RunAsync(request, emitJsonToStdout, cancellationToken);
+}
+
+static MaintenanceRunRequest ResolveCliRequest(IConfiguration configuration)
+{
+    return new MaintenanceRunRequest
+    {
+        InputSource = configuration[$"{RepoOpsWorkerOptions.SectionName}:InputSource"] ?? "worker-cli",
+        TriggerRenovateExecution = configuration.GetValue<bool>($"{RepoOpsWorkerOptions.SectionName}:TriggerRenovateExecution")
+    };
+}
+
+static void ConfigureWorkerUrls(WebApplicationBuilder builder)
+{
+    if (!string.IsNullOrWhiteSpace(builder.Configuration["ASPNETCORE_URLS"]))
+    {
+        return;
+    }
+
+    var configuredPort = builder.Configuration["WORKER_HTTP_PORT"]
+        ?? builder.Configuration[$"{RepoOpsWorkerOptions.SectionName}:HttpPort"];
+    var port = int.TryParse(configuredPort, out var parsedPort) ? parsedPort : 8080;
+
+    builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+}
 
 static LogLevel ResolveLogLevel(string? value) => value?.ToLowerInvariant() switch
 {
@@ -129,8 +250,6 @@ static Dictionary<string, string?> ParseWorkerOverrides(IEnumerable<string> args
     {
         if (string.Equals(arg, "--run-once", StringComparison.OrdinalIgnoreCase))
         {
-            overrides["RepoOps:Worker:ContinuousModeEnabled"] = "false";
-            overrides["RepoOps:Worker:RunOnStartup"] = "true";
             continue;
         }
 

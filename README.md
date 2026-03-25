@@ -63,11 +63,11 @@ Dans cette phase, `Renovate` reste volontairement hors du cockpit Aspire afin de
 `n8n` conserve un rôle ciblé :
 
 - déclenchements planifiés ;
-- déclenchement du worker via un signal simple ;
+- déclenchement HTTP du worker ;
 - lecture du rapport produit ;
 - envoi de l’email.
 
-Le workflow versionné ne reconstruit plus la synthèse métier. Il consomme les artefacts produits par le worker.
+Le workflow versionné ne reconstruit plus la synthèse métier. Il consomme la réponse JSON et les contenus déjà produits par le worker.
 
 ### Scripts transitoires
 
@@ -76,15 +76,15 @@ Le dossier `scripts/` reste présent pour la transition, mais il ne fait plus pa
 ## Flux réel retenu
 
 1. `n8n` déclenche le workflow quotidien.
-2. Le workflow crée un fichier de déclenchement partagé dans `runtime/`.
-3. Le worker `.NET`, maintenu en veille légère, détecte ce trigger et exécute un cycle.
-4. Le worker écrit :
+2. Le workflow appelle `POST /maintenance/run` sur le worker via le réseau Docker interne.
+3. Le worker `.NET` exécute le cycle complet et renvoie directement le JSON du rapport.
+4. Le worker écrit également :
    - [`worker-summary.json`](./reports/worker-summary.json)
    - [`worker-summary.txt`](./reports/worker-summary.txt)
    - [`worker-summary.html`](./reports/worker-summary.html)
    - [`renovate-execution.json`](./reports/renovate-execution.json) lorsqu'une exécution explicite de `Renovate` est lancée via le worker
    Le worker interroge GitHub avec `GITHUB_TOKEN` pour récupérer les PR Renovate ouvertes, les PR Renovate fusionnées récemment, les fermetures sans fusion récentes, les checks utiles à la qualification opérationnelle, les `Dependabot alerts` ouvertes et corrigées quand elles sont disponibles, ainsi que les informations nécessaires à une décision d’auto-merge contrôlé.
-5. `n8n` supprime d'abord les anciens artefacts, puis lit le JSON frais produit par le worker.
+5. `n8n` lit le JSON renvoyé directement par l’API du worker.
 6. `n8n` envoie l’email en réutilisant directement le sujet, le texte et le HTML déjà préparés.
 
 ## Auto-merge contrôlé
@@ -193,6 +193,7 @@ docker compose --profile maintenance run --rm renovate --version
 2. Définir au minimum :
    - `GITHUB_TOKEN`
      Ce jeton doit aussi permettre la lecture des `Dependabot alerts` si vous voulez enrichir la section sécurité.
+   - `WORKER_HTTP_PORT`
    - `GITHUB_API_BASE_URL` si vous ciblez autre chose que `github.com`
    - `GITHUB_RECENT_MERGED_WINDOW_DAYS` si vous voulez ajuster la fenêtre des fusions récentes
    - `RENOVATE_REPOSITORIES`
@@ -250,8 +251,7 @@ Cette couche Aspire sert au pilotage local. Pour les exécutions réelles de la 
 - les overrides par dépôt reposent sur un matching exact `owner/repo` ;
 - l’exécution explicite de `Renovate` supervisée par le worker doit être lancée depuis l’hôte, pas depuis le conteneur `worker` ;
 - la qualification du run `Renovate` repose encore sur des heuristiques de logs `stdout` et `stderr` ;
-- le déclenchement de maintenance repose encore sur un fichier partagé simple ;
-- le worker fonctionne encore en veille par scrutation légère, pas via une API dédiée ;
+- le worker expose désormais une API locale simple, mais sans authentification dédiée à ce stade car elle reste confinée au réseau Docker interne ;
 - la configuration SMTP et les destinataires restent à finaliser manuellement dans `n8n` ;
 - le workflow quotidien exploite le dernier résultat connu de `Renovate`, mais ne le relance pas automatiquement ;
 - le superviseur IA n’est pas implémenté.
@@ -269,7 +269,9 @@ docker compose logs --tail=100 worker postgres n8n
 docker compose exec postgres sh -lc 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
 docker compose exec n8n n8n import:workflow --input=/files/workflows/repo-ops-daily-maintenance.json
 dotnet build .\RepoOps.sln
-dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --run-once --emit-json-to-stdout --input-source=validation-locale
+Invoke-WebRequest -Uri "http://127.0.0.1:8080/health" | Select-Object -ExpandProperty Content
+Invoke-WebRequest -Uri "http://127.0.0.1:8080/maintenance/run" -Method Post -ContentType "application/json" -Body '{"inputSource":"validation-http","triggerRenovateExecution":false}' | Select-Object -ExpandProperty Content
+dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --run-once --emit-json-to-stdout --input-source=validation-cli
 dotnet run --project .\src\RepoOps.Worker -- --run-once --run-renovate --emit-json-to-stdout --input-source=validation-renovate
 $env:AUTOMERGE_ENABLED="true"
 $env:AUTOMERGE_DRY_RUN_ENABLED="true"
@@ -291,7 +293,7 @@ Exemple de configuration minimale pour une exécution locale ciblée :
 ```powershell
 $env:GITHUB_TOKEN="ghp_votre_jeton"
 $env:RENOVATE_REPOSITORIES="owner/repo-a,owner/repo-b"
-dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --run-once --emit-json-to-stdout --input-source=test-local
+Invoke-WebRequest -Uri "http://127.0.0.1:8080/maintenance/run" -Method Post -ContentType "application/json" -Body '{"inputSource":"test-http","triggerRenovateExecution":false}' | Select-Object -ExpandProperty Content
 ```
 
 Exemple de simulation d’auto-merge sans merge réel :

@@ -5,6 +5,7 @@ services:
       dockerfile: src/RepoOps.Worker/Dockerfile
     restart: unless-stopped
     environment:
+      ASPNETCORE_URLS: http://+:${WORKER_HTTP_PORT}
       TZ: ${TZ}
       LOG_LEVEL: ${LOG_LEVEL}
       GITHUB_TOKEN: ${GITHUB_TOKEN}
@@ -17,19 +18,19 @@ services:
       AUTOMERGE_ALLOWED_MERGEABLE_STATES: ${AUTOMERGE_ALLOWED_MERGEABLE_STATES}
       AUTOMERGE_MERGE_METHOD: ${AUTOMERGE_MERGE_METHOD}
       AUTOMERGE_POLICY_FILE_PATH: ${AUTOMERGE_POLICY_FILE_PATH}
-      RepoOps__Worker__ContinuousModeEnabled: "true"
-      RepoOps__Worker__RunOnStartup: "false"
-      RepoOps__Worker__LoopIntervalSeconds: ${WORKER_LOOP_INTERVAL_SECONDS}
+      WORKER_HTTP_PORT: ${WORKER_HTTP_PORT}
+      RepoOps__Worker__HttpPort: ${WORKER_HTTP_PORT}
+      RepoOps__Worker__ExecutionTimeoutSeconds: ${WORKER_EXECUTION_TIMEOUT_SECONDS}
       RepoOps__Worker__InputSource: docker-compose
       RepoOps__Worker__EmitJsonToStdout: "false"
       RepoOps__Worker__ReportOutputPath: ${WORKER_REPORT_OUTPUT_PATH}
       RepoOps__Worker__SummaryTextOutputPath: ${WORKER_SUMMARY_TEXT_OUTPUT_PATH}
       RepoOps__Worker__SummaryHtmlOutputPath: ${WORKER_SUMMARY_HTML_OUTPUT_PATH}
-      RepoOps__Worker__TriggerFilePath: ${WORKER_TRIGGER_FILE_PATH}
     volumes:
       - ./reports:/app/reports
-      - ./runtime:/app/runtime
       - ./config:/app/config:ro
+    expose:
+      - "${WORKER_HTTP_PORT}"
     healthcheck:
       test: ["CMD-SHELL", "grep -aq 'RepoOps.Worker.dll' /proc/1/cmdline"]
       interval: 30s
@@ -93,8 +94,6 @@ services:
     volumes:
       - n8n-data:/home/node/.n8n
       - ./n8n/workflows:/files/workflows
-      - ./reports:/files/reports:ro
-      - ./runtime:/files/runtime
     healthcheck:
       test:
         - CMD-SHELL

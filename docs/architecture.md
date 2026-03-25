@@ -14,15 +14,14 @@
 ## Flux réel retenu
 
 1. `n8n` déclenche un workflow quotidien.
-2. Le workflow écrit un fichier de trigger partagé.
-3. Le worker `.NET`, maintenu en veille légère, détecte ce trigger.
-4. Le worker charge le dernier résultat connu d’une exécution explicite de `Renovate`, sans relancer `Renovate` dans ce cycle quotidien.
-5. Le worker produit les artefacts de sortie :
+2. Le workflow appelle `POST /maintenance/run` sur le worker via le réseau Docker interne.
+3. Le worker charge le dernier résultat connu d’une exécution explicite de `Renovate`, sans relancer `Renovate` dans ce cycle quotidien.
+4. Le worker produit la réponse JSON et les artefacts de sortie :
    - JSON stable
    - texte
    - HTML
-6. `n8n` lit le JSON frais du worker après purge des anciens artefacts.
-7. `n8n` envoie l’email à partir du digest déjà produit.
+5. `n8n` consomme le JSON renvoyé directement par le worker.
+6. `n8n` envoie l’email à partir du digest déjà produit.
 
 ## Rôles des composants
 
@@ -46,7 +45,7 @@ Par défaut :
 - rendu du digest ;
 - persistance des sorties ;
 - mode `run once` exploitable localement ;
-- détection d’un trigger simple dans `runtime/`.
+- exposition d’une API HTTP minimale pour déclencher un cycle.
 
 Dans l’état actuel, le worker :
 
@@ -93,7 +92,7 @@ Dans ce lot :
 `n8n` orchestre :
 
 - les déclenchements planifiés ;
-- le déclenchement simple du worker via un fichier partagé ;
+- le déclenchement simple du worker via HTTP ;
 - la lecture du rapport produit ;
 - l’envoi des notifications par email.
 
@@ -196,8 +195,7 @@ Chaque override peut :
 - la qualification d’une exécution `Renovate` reste basée sur l’analyse de ses logs, pas sur un rapport structuré natif stabilisé ;
 - l’auto-merge réel reste conservateur et peut refuser des PR pourtant mergeables si le contexte GitHub n’est pas strictement `clean` ;
 - les overrides par dépôt ne prennent pas encore en charge des motifs globaux ou des groupes de dépôts ;
-- le déclenchement repose sur un fichier partagé simple ;
-- le worker reste pour l'instant en veille par scrutation légère ;
+- l’API HTTP du worker reste locale au réseau Docker et ne porte pas encore de mécanisme d’authentification dédié ;
 - l'intégration GitHub n'exploite pas encore les issues, les dépendances de sécurité ni l'historique détaillé d'exécution de Renovate ;
 - le flux quotidien n8n ne relance pas `Renovate` automatiquement ; il exploite le dernier résultat connu.
 
@@ -209,9 +207,8 @@ flowchart LR
     Compose --> Postgres["PostgreSQL"]
     Compose --> N8N["n8n"]
     Compose -. maintenance explicite .-> Renovate["Renovate"]
-    N8N --> Trigger["Fichier de déclenchement"]
-    Trigger --> Worker
-    Worker --> Reports["JSON + TXT + HTML"]
+    N8N --> Worker
+    Worker --> Reports["Réponse JSON + TXT + HTML"]
     Worker -. exécution explicite .-> Renovate
     Worker --> RenovateArtifact["Artefact renovate-execution.json"]
     N8N --> Reports

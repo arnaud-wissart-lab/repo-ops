@@ -11,39 +11,64 @@ public sealed class MaintenanceWorkflowService(
     MaintenanceReportPersistenceService persistenceService,
     IOptions<RepoOpsWorkerOptions> options)
 {
-    public async Task<MaintenanceRunReport> RunAsync(CancellationToken cancellationToken)
+    private readonly SemaphoreSlim executionLock = new(1, 1);
+
+    public async Task<MaintenanceRunReport> RunAsync(
+        MaintenanceRunRequest request,
+        bool emitJsonToStdout,
+        CancellationToken cancellationToken)
     {
         var settings = options.Value;
-        var report = await reportBuilder.BuildAsync(settings.InputSource, cancellationToken);
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(TimeSpan.FromSeconds(settings.ExecutionTimeoutSeconds));
 
-        logger.LogInformation(
-            "Début d'un cycle du worker .NET pour {RepositoryCount} dépôt(s) ciblé(s)",
-            report.Summary.Counts.ScannedRepositories);
+        await executionLock.WaitAsync(timeoutCts.Token);
 
-        report = new MaintenanceRunReport
+        try
         {
-            Summary = report.Summary,
-            RenovateExecution = report.RenovateExecution,
-            PullRequestStatuses = report.PullRequestStatuses,
-            AutoMerge = report.AutoMerge,
-            Messages = report.Messages,
-            Recommendations = report.Recommendations,
-            Digest = digestRenderer.Render(report)
-        };
+            logger.LogInformation(
+                "Début d'un cycle du worker .NET via {InputSource}, lancement Renovate demandé : {TriggerRenovateExecution}",
+                request.InputSource,
+                request.TriggerRenovateExecution);
 
-        await persistenceService.PersistAsync(report, cancellationToken);
+            var report = await reportBuilder.BuildAsync(request, timeoutCts.Token);
 
-        if (settings.EmitJsonToStdout)
-        {
-            Console.Out.WriteLine(persistenceService.Serialize(report));
+            report = new MaintenanceRunReport
+            {
+                Summary = report.Summary,
+                RenovateExecution = report.RenovateExecution,
+                PullRequestStatuses = report.PullRequestStatuses,
+                Vulnerabilities = report.Vulnerabilities,
+                AutoMerge = report.AutoMerge,
+                Messages = report.Messages,
+                Recommendations = report.Recommendations,
+                Digest = digestRenderer.Render(report)
+            };
+
+            await persistenceService.PersistAsync(report, timeoutCts.Token);
+
+            if (emitJsonToStdout)
+            {
+                Console.Out.WriteLine(persistenceService.Serialize(report));
+            }
+
+            logger.LogInformation(
+                "Cycle terminé, rapport écrit dans {ReportOutputPath}, texte dans {TextOutputPath} et HTML dans {HtmlOutputPath}",
+                settings.ReportOutputPath,
+                settings.SummaryTextOutputPath,
+                settings.SummaryHtmlOutputPath);
+
+            return report;
         }
-
-        logger.LogInformation(
-            "Cycle terminé, rapport écrit dans {ReportOutputPath}, texte dans {TextOutputPath} et HTML dans {HtmlOutputPath}",
-            settings.ReportOutputPath,
-            settings.SummaryTextOutputPath,
-            settings.SummaryHtmlOutputPath);
-
-        return report;
+        catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested && timeoutCts.IsCancellationRequested)
+        {
+            throw new MaintenanceExecutionTimeoutException(
+                $"Le délai d'exécution du cycle de maintenance a dépassé {settings.ExecutionTimeoutSeconds} seconde(s).",
+                exception);
+        }
+        finally
+        {
+            executionLock.Release();
+        }
     }
 }

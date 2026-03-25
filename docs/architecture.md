@@ -50,9 +50,11 @@ Par défaut :
 Dans l’état actuel, le worker :
 
 - lit `RENOVATE_REPOSITORIES` ;
-- produit un rapport JSON placeholder structuré ;
+- interroge GitHub via `GITHUB_TOKEN` ;
+- produit un rapport JSON structuré stable ;
 - sépare les modèles métier, le rendu du digest et la persistance ;
 - génère un sujet, un texte brut et un HTML simples ;
+- récupère les PR Renovate ouvertes, les PR Renovate fusionnées récemment et les échecs de checks les plus simples ;
 - peut émettre le JSON sur `stdout` en mode explicite.
 
 ### Aspire AppHost
@@ -122,7 +124,7 @@ docker compose --profile maintenance run --rm renovate --version
 
 ### Ce qui relève du Worker .NET
 
-- porter la logique métier de collecte, consolidation et synthèse ;
+- porter la logique métier de collecte GitHub, consolidation et synthèse ;
 - produire le contrat de sortie de référence ;
 - fournir les artefacts consommés par `n8n`.
 
@@ -135,10 +137,11 @@ docker compose --profile maintenance run --rm renovate --version
 
 ## Limites actuelles
 
-- le worker produit encore un contenu placeholder ;
+- la collecte GitHub reste limitée au périmètre REST minimal utile à ce lot ;
+- la détection des vulnérabilités n'est pas encore branchée ;
 - le déclenchement repose sur un fichier partagé simple ;
 - le worker reste pour l'instant en veille par scrutation légère ;
-- aucune intégration GitHub réelle n’est branchée à ce stade ;
+- l'intégration GitHub n'exploite pas encore les issues, les dépendances de sécurité ni l'historique détaillé d'exécution de Renovate ;
 - `Renovate` n’est pas encore intégré à une planification de maintenance dédiée dans le dépôt.
 
 ## Diagramme

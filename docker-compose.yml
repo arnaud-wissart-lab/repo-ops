@@ -7,7 +7,10 @@ services:
     environment:
       TZ: ${TZ}
       LOG_LEVEL: ${LOG_LEVEL}
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
       RENOVATE_REPOSITORIES: ${RENOVATE_REPOSITORIES}
+      GITHUB_API_BASE_URL: ${GITHUB_API_BASE_URL}
+      GITHUB_RECENT_MERGED_WINDOW_DAYS: ${GITHUB_RECENT_MERGED_WINDOW_DAYS}
       RepoOps__Worker__ContinuousModeEnabled: "true"
       RepoOps__Worker__RunOnStartup: "false"
       RepoOps__Worker__LoopIntervalSeconds: ${WORKER_LOOP_INTERVAL_SECONDS}

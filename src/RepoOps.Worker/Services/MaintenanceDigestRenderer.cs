@@ -23,7 +23,7 @@ public sealed class MaintenanceDigestRenderer
         builder.AppendLine($"Date d'exécution : {report.Summary.RunDateUtc:O}");
         builder.AppendLine($"Statut : {report.Summary.Status}");
         builder.AppendLine(
-            $"Dépôts scannés : {(report.Summary.ScannedRepositories.Count > 0 ? string.Join(", ", report.Summary.ScannedRepositories) : "aucun dépôt configuré")}");
+            $"Dépôts scannés : {(report.Summary.ScannedRepositories.Count > 0 ? string.Join(", ", report.Summary.ScannedRepositories) : "aucun dépôt scanné")}");
         builder.AppendLine();
         builder.AppendLine("Compteurs :");
         builder.AppendLine($"- PR créées : {report.Summary.Counts.CreatedPullRequests}");
@@ -31,20 +31,32 @@ public sealed class MaintenanceDigestRenderer
         builder.AppendLine($"- PR en échec : {report.Summary.Counts.FailedPullRequests}");
         builder.AppendLine($"- Vulnérabilités restantes : {report.Summary.Counts.RemainingVulnerabilities}");
         builder.AppendLine();
+        AppendSection(
+            builder,
+            "PR ouvertes Renovate détectées",
+            report.Summary.CreatedPullRequests,
+            "Aucune PR ouverte Renovate détectée.");
+        builder.AppendLine();
+        AppendSection(
+            builder,
+            "PR fusionnées récemment",
+            report.Summary.MergedPullRequests,
+            "Aucune PR fusionnée récemment.");
+        builder.AppendLine();
+        AppendSection(
+            builder,
+            "PR en échec détectées",
+            report.Summary.FailedPullRequests,
+            "Aucune PR en échec détectée.");
+        builder.AppendLine();
         builder.AppendLine("Actions manuelles recommandées :");
 
-        foreach (var action in report.Recommendations.ManualActions)
-        {
-            builder.AppendLine($"- {action}");
-        }
+        AppendBullets(builder, report.Recommendations.ManualActions, "Aucune action manuelle supplémentaire.");
 
         builder.AppendLine();
         builder.AppendLine("Notes :");
 
-        foreach (var note in report.Messages.Notes)
-        {
-            builder.AppendLine($"- {note}");
-        }
+        AppendBullets(builder, report.Messages.Notes, "Aucune note complémentaire.");
 
         return builder.ToString().TrimEnd();
     }
@@ -76,7 +88,7 @@ public sealed class MaintenanceDigestRenderer
                     <h1>Synthèse repo-ops</h1>
                     <p><strong>Date d'exécution :</strong> {Escape(report.Summary.RunDateUtc.ToString("O"))}</p>
                     <p><strong>Statut :</strong> {Escape(report.Summary.Status)}</p>
-                    <p><strong>Dépôts scannés :</strong> {Escape(report.Summary.ScannedRepositories.Count > 0 ? string.Join(", ", report.Summary.ScannedRepositories) : "aucun dépôt configuré")}</p>
+                    <p><strong>Dépôts scannés :</strong> {Escape(report.Summary.ScannedRepositories.Count > 0 ? string.Join(", ", report.Summary.ScannedRepositories) : "aucun dépôt scanné")}</p>
                     <h2>Compteurs</h2>
                     <ul>
                       <li>PR créées : {report.Summary.Counts.CreatedPullRequests}</li>
@@ -84,6 +96,12 @@ public sealed class MaintenanceDigestRenderer
                       <li>PR en échec : {report.Summary.Counts.FailedPullRequests}</li>
                       <li>Vulnérabilités restantes : {report.Summary.Counts.RemainingVulnerabilities}</li>
                     </ul>
+                    <h2>PR ouvertes Renovate détectées</h2>
+                    {RenderList(report.Summary.CreatedPullRequests, "Aucune PR ouverte Renovate détectée.")}
+                    <h2>PR fusionnées récemment</h2>
+                    {RenderList(report.Summary.MergedPullRequests, "Aucune PR fusionnée récemment.")}
+                    <h2>PR en échec détectées</h2>
+                    {RenderList(report.Summary.FailedPullRequests, "Aucune PR en échec détectée.")}
                     <h2>Actions manuelles recommandées</h2>
                     {RenderList(report.Recommendations.ManualActions, "Aucune action manuelle supplémentaire.")}
                     <h2>Notes</h2>
@@ -91,5 +109,32 @@ public sealed class MaintenanceDigestRenderer
                   </body>
                 </html>
                 """;
+    }
+
+    private static void AppendSection(
+        StringBuilder builder,
+        string title,
+        IReadOnlyList<string> items,
+        string fallback)
+    {
+        builder.AppendLine($"{title} :");
+        AppendBullets(builder, items, fallback);
+    }
+
+    private static void AppendBullets(
+        StringBuilder builder,
+        IReadOnlyList<string> items,
+        string fallback)
+    {
+        if (items.Count == 0)
+        {
+            builder.AppendLine($"- {fallback}");
+            return;
+        }
+
+        foreach (var item in items)
+        {
+            builder.AppendLine($"- {item}");
+        }
     }
 }

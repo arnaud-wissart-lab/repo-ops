@@ -40,9 +40,10 @@ Par défaut, il démarre :
 - génération du texte de synthèse ;
 - génération d’un HTML simple ;
 - persistance des artefacts ;
-- future base pour la collecte réelle et la supervision.
+- première collecte GitHub réelle ;
+- future base pour la supervision.
 
-Dans ce lot, le worker reste placeholder sur le fond métier, mais devient la source de vérité du reporting.
+Dans ce lot, le worker devient la source de vérité du reporting et interroge réellement GitHub pour une première collecte ciblée.
 
 ### Aspire AppHost
 
@@ -80,6 +81,7 @@ Le dossier `scripts/` reste présent pour la transition, mais il ne fait plus pa
    - [`worker-summary.json`](./reports/worker-summary.json)
    - [`worker-summary.txt`](./reports/worker-summary.txt)
    - [`worker-summary.html`](./reports/worker-summary.html)
+   Le worker interroge GitHub avec `GITHUB_TOKEN` pour récupérer les PR Renovate ouvertes, les PR Renovate fusionnées récemment et les états de checks les plus simples.
 5. `n8n` supprime d'abord les anciens artefacts, puis lit le JSON frais produit par le worker.
 6. `n8n` envoie l’email en réutilisant directement le sujet, le texte et le HTML déjà préparés.
 
@@ -123,6 +125,8 @@ docker compose --profile maintenance run --rm renovate --version
 
 2. Définir au minimum :
    - `GITHUB_TOKEN`
+   - `GITHUB_API_BASE_URL` si vous ciblez autre chose que `github.com`
+   - `GITHUB_RECENT_MERGED_WINDOW_DAYS` si vous voulez ajuster la fenêtre des fusions récentes
    - `RENOVATE_REPOSITORIES`
    - `N8N_ENCRYPTION_KEY`
    - `POSTGRES_PASSWORD`
@@ -149,7 +153,7 @@ docker compose --profile maintenance run --rm renovate --version
 ## Démarrage local avec Aspire et Visual Studio
 
 1. Ouvrir [`RepoOps.sln`](./RepoOps.sln) dans Visual Studio 2022 ou plus récent avec le support Aspire installé.
-2. Configurer `POSTGRES_PASSWORD` et `N8N_ENCRYPTION_KEY` via des variables d’environnement locales ou via `dotnet user-secrets` sur le projet AppHost.
+2. Configurer `POSTGRES_PASSWORD`, `N8N_ENCRYPTION_KEY` et `GITHUB_TOKEN` via des variables d’environnement locales ou via `dotnet user-secrets` sur le projet AppHost si vous voulez activer la collecte GitHub réelle.
 3. Définir [`src/RepoOps.AppHost`](./src/RepoOps.AppHost) comme projet de démarrage.
 4. Lancer l’application pour ouvrir le tableau de bord Aspire et observer les ressources locales.
 
@@ -158,14 +162,18 @@ Exemple avec `dotnet user-secrets` :
 ```powershell
 dotnet user-secrets --project .\src\RepoOps.AppHost set POSTGRES_PASSWORD "mot-de-passe-local"
 dotnet user-secrets --project .\src\RepoOps.AppHost set N8N_ENCRYPTION_KEY "cle-locale-longue-et-stable"
+dotnet user-secrets --project .\src\RepoOps.AppHost set GITHUB_TOKEN "ghp_votre_jeton"
 ```
 
 Cette couche Aspire sert au pilotage local. Pour les exécutions réelles de la stack, conserver `docker compose`.
 
 ## Limites actuelles
 
-- le worker ne parle pas encore à l’API GitHub, à Renovate ou à la CI ;
-- le contenu produit reste placeholder sur le fond métier ;
+- le worker interroge désormais GitHub, mais seulement sur un premier périmètre REST limité ;
+- les PR ouvertes sont comptées à partir des PR Renovate détectées, pas à partir d’un historique d’exécution `Renovate` propre au dépôt ;
+- les PR fusionnées sont lues dans une fenêtre glissante configurable, limitée au dernier lot de PR fermées renvoyé par l’API ;
+- l’état des échecs repose pour l’instant sur le statut combiné des checks GitHub sur la tête de PR ;
+- la collecte des vulnérabilités reste encore placeholder ;
 - le déclenchement de maintenance repose encore sur un fichier partagé simple ;
 - le worker fonctionne encore en veille par scrutation légère, pas via une API dédiée ;
 - la configuration SMTP et les destinataires restent à finaliser manuellement dans `n8n` ;
@@ -188,4 +196,22 @@ dotnet build .\RepoOps.sln
 dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --run-once --emit-json-to-stdout --input-source=validation-locale
 docker compose --profile maintenance run --rm renovate --version
 docker compose down
+```
+
+Exemple de configuration minimale pour une exécution locale ciblée :
+
+```powershell
+$env:GITHUB_TOKEN="ghp_votre_jeton"
+$env:RENOVATE_REPOSITORIES="owner/repo-a,owner/repo-b"
+dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --run-once --emit-json-to-stdout --input-source=test-local
+```
+
+Exemple de statut attendu en sortie :
+
+```json
+{
+  "summary": {
+    "status": "Success|Partial|Failed"
+  }
+}
 ```

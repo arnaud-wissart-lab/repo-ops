@@ -14,10 +14,10 @@ public sealed class MaintenanceWorkflowService(
     public async Task<MaintenanceRunReport> RunAsync(CancellationToken cancellationToken)
     {
         var settings = options.Value;
-        var report = reportBuilder.Build(settings.InputSource);
+        var report = await reportBuilder.BuildAsync(settings.InputSource, cancellationToken);
 
         logger.LogInformation(
-            "Début d'un cycle placeholder du worker .NET pour {RepositoryCount} dépôt(s)",
+            "Début d'un cycle du worker .NET pour {RepositoryCount} dépôt(s) ciblé(s)",
             report.Summary.Counts.ScannedRepositories);
 
         report = new MaintenanceRunReport
@@ -36,7 +36,7 @@ public sealed class MaintenanceWorkflowService(
         }
 
         logger.LogInformation(
-            "Cycle placeholder terminé, rapport écrit dans {ReportOutputPath}, texte dans {TextOutputPath} et HTML dans {HtmlOutputPath}",
+            "Cycle terminé, rapport écrit dans {ReportOutputPath}, texte dans {TextOutputPath} et HTML dans {HtmlOutputPath}",
             settings.ReportOutputPath,
             settings.SummaryTextOutputPath,
             settings.SummaryHtmlOutputPath);

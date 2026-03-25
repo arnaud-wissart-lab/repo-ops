@@ -35,7 +35,7 @@ Déplacer progressivement la logique utile vers la couche `.NET`, tout en conser
 
 ### Livrables
 
-- collecte structurée dans le worker ;
+- collecte GitHub structurée dans le worker ;
 - consolidation de résultats multi-repo ;
 - génération de synthèse plus complète ;
 - workflows `n8n` mieux alignés avec les sorties du worker ;
@@ -51,6 +51,7 @@ Déplacer progressivement la logique utile vers la couche `.NET`, tout en conser
 
 - un cycle quotidien complet peut être observé localement ;
 - la synthèse s’appuie majoritairement sur la couche `.NET` ;
+- le worker sait interroger GitHub sur un premier périmètre réel sans casser le contrat de sortie ;
 - les scripts restants ont un rôle limité, explicite et documenté.
 
 ## Phase 3 - Superviseur IA

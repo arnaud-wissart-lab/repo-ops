@@ -1,50 +1,54 @@
 using RepoOps.Worker.Models;
+using RepoOps.Worker.Options;
 
 namespace RepoOps.Worker.Services;
 
-public sealed class MaintenanceReportBuilder(IConfiguration configuration)
+public sealed class MaintenanceReportBuilder(
+    IConfiguration configuration,
+    GitHubMaintenanceCollector gitHubMaintenanceCollector,
+    ILogger<MaintenanceReportBuilder> logger)
 {
-    public MaintenanceRunReport Build(string inputSource)
+    public async Task<MaintenanceRunReport> BuildAsync(
+        string inputSource,
+        CancellationToken cancellationToken)
     {
         var repositories = ResolveRepositories(configuration["RENOVATE_REPOSITORIES"]);
+        var collectionResult = await gitHubMaintenanceCollector.CollectAsync(repositories, cancellationToken);
+
+        logger.LogInformation(
+            "Collecte GitHub terminée avec le statut {Status} pour {ScannedRepositoryCount} dépôt(s) scanné(s)",
+            collectionResult.Status,
+            collectionResult.ScannedRepositories.Count);
 
         return new MaintenanceRunReport
         {
             Summary = new MaintenanceExecutionSummary
             {
+                Status = collectionResult.Status,
                 InputSource = inputSource,
                 RunDateUtc = DateTimeOffset.UtcNow,
-                ScannedRepositories = repositories,
+                ScannedRepositories = collectionResult.ScannedRepositories,
+                CreatedPullRequests = collectionResult.CreatedPullRequests,
+                MergedPullRequests = collectionResult.MergedPullRequests,
+                FailedPullRequests = collectionResult.FailedPullRequests,
+                RemainingVulnerabilities = collectionResult.RemainingVulnerabilities,
                 Counts = new MaintenanceCounts
                 {
-                    ScannedRepositories = repositories.Count,
-                    CreatedPullRequests = 0,
-                    MergedPullRequests = 0,
-                    FailedPullRequests = 0,
-                    RemainingVulnerabilities = 0
+                    ScannedRepositories = collectionResult.ScannedRepositories.Count,
+                    CreatedPullRequests = collectionResult.CreatedPullRequests.Count,
+                    MergedPullRequests = collectionResult.MergedPullRequests.Count,
+                    FailedPullRequests = collectionResult.FailedPullRequests.Count,
+                    RemainingVulnerabilities = collectionResult.RemainingVulnerabilities.Count
                 }
             },
             Messages = new MaintenanceMessages
             {
-                Logs =
-                [
-                    "[worker] Exécution placeholder sans appel externe.",
-                    "[worker] Le périmètre des dépôts provient de RENOVATE_REPOSITORIES lorsqu'il est renseigné."
-                ],
-                Notes =
-                [
-                    "Le worker .NET devient la source de vérité du reporting dans repo-ops.",
-                    "Aucune interrogation GitHub réelle n'est encore implémentée à ce stade."
-                ]
+                Logs = collectionResult.Logs,
+                Notes = collectionResult.Notes
             },
             Recommendations = new MaintenanceRecommendations
             {
-                ManualActions =
-                [
-                    "Brancher la collecte réelle sur l'API GitHub ou sur les journaux Renovate.",
-                    "Conserver n8n dans un rôle d'orchestration et de notification.",
-                    "Préparer ensuite l'intégration de sources réelles sans casser le contrat JSON."
-                ]
+                ManualActions = collectionResult.ManualActions
             }
         };
     }

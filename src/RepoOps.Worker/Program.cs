@@ -1,4 +1,5 @@
 using RepoOps.Worker;
+using RepoOps.Worker.Clients;
 using RepoOps.Worker.Options;
 using RepoOps.Worker.Services;
 
@@ -7,6 +8,20 @@ builder.Configuration.AddInMemoryCollection(ParseWorkerOverrides(args));
 builder.Logging.SetMinimumLevel(ResolveLogLevel(builder.Configuration["LOG_LEVEL"]));
 builder.Services.Configure<RepoOpsWorkerOptions>(
     builder.Configuration.GetSection(RepoOpsWorkerOptions.SectionName));
+builder.Services.AddOptions<GitHubOptions>()
+    .Configure<IConfiguration>((options, configuration) =>
+    {
+        configuration.GetSection(GitHubOptions.SectionName).Bind(options);
+        options.Token = configuration["GITHUB_TOKEN"] ?? options.Token;
+        options.ApiBaseUrl = configuration["GITHUB_API_BASE_URL"] ?? options.ApiBaseUrl;
+
+        if (int.TryParse(configuration["GITHUB_RECENT_MERGED_WINDOW_DAYS"], out var recentMergedWindowDays))
+        {
+            options.RecentMergedWindowDays = recentMergedWindowDays;
+        }
+    });
+builder.Services.AddHttpClient<GitHubApiClient>();
+builder.Services.AddSingleton<GitHubMaintenanceCollector>();
 builder.Services.AddSingleton<MaintenanceReportBuilder>();
 builder.Services.AddSingleton<MaintenanceDigestRenderer>();
 builder.Services.AddSingleton<MaintenanceReportPersistenceService>();

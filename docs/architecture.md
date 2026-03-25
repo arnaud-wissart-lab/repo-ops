@@ -10,7 +10,15 @@ Ce dépôt fournit un socle centralisé pour piloter la maintenance de plusieurs
 
 ### n8n
 
-`n8n` orchestre les déclenchements, les exécutions planifiées, les enchaînements futurs avec les scripts de collecte et l’envoi des synthèses. Dans le premier jet, il sert surtout de point d’entrée d’orchestration et de supervision légère.
+`n8n` orchestre les déclenchements, les exécutions planifiées, les enchaînements futurs avec les scripts de collecte et l’envoi des synthèses. Dans le premier jet, il s’appuie sur des workflows JSON versionnés dans le dépôt pour garder une base relisible, importable et testable localement.
+
+Le workflow quotidien prévu suit la séquence suivante :
+
+- `Cron` quotidien ;
+- préparation du contexte d’exécution ;
+- appel d’un script local via `Execute Command` ;
+- génération d’une synthèse ;
+- envoi d’un email.
 
 ### Scripts
 
@@ -19,6 +27,8 @@ Les scripts du dossier `scripts/` portent la logique opérationnelle qui ne rel�
 - collecte des résultats de scan, des pull requests créées et des échecs éventuels ;
 - préparation d’un modèle de données consolidé ;
 - point d’intégration futur pour des règles métiers plus fines.
+
+Dans le lot actuel, [`scripts/collect-results.sh`](../scripts/collect-results.sh) sert de contrat d’échange entre le workflow `n8n` et la future collecte réelle. Il retourne déjà un JSON stable afin de permettre l’import et le test du workflow sans dépendre de l’environnement final.
 
 ### Templates d’email
 
@@ -39,12 +49,15 @@ Cette brique n’est pas implémentée dans le premier jet afin de conserver un 
 
 ```mermaid
 flowchart LR
-    Scheduler["Planification n8n"] --> Renovate["Renovate self-hosted"]
+    Scheduler["Workflow n8n quotidien"] --> Context["Préparer le contexte"]
+    Context --> Collect["Execute Command / collect-results.sh"]
+    Collect --> Summary["Générer la synthèse"]
+    Summary --> Mail["Email Send"]
+    Scheduler --> Renovate["Renovate self-hosted"]
     Renovate --> GitHub["Dépôts GitHub en allowlist"]
     GitHub --> CI["CI GitHub"]
-    Renovate --> Collect["Scripts de collecte"]
+    Renovate --> Collect
     CI --> Collect
-    Collect --> Templates["Templates email HTML/TXT"]
-    Templates --> Mail["Résumé quotidien SMTP"]
+    Templates["Templates email HTML/TXT"] -. évolution future .-> Summary
     Collect -. extension future .-> AI["Superviseur IA"]
 ```

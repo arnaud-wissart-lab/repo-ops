@@ -25,6 +25,7 @@ services:
     environment:
       TZ: ${TZ}
       GENERIC_TIMEZONE: ${TZ}
+      LOG_LEVEL: ${LOG_LEVEL}
       N8N_HOST: ${N8N_HOST}
       N8N_PORT: ${N8N_PORT}
       N8N_PROTOCOL: ${N8N_PROTOCOL}
@@ -46,11 +47,14 @@ services:
       DB_POSTGRESDB_DATABASE: ${POSTGRES_DB}
       DB_POSTGRESDB_USER: ${POSTGRES_USER}
       DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
+      RENOVATE_REPOSITORIES: ${RENOVATE_REPOSITORIES}
     ports:
       - "127.0.0.1:${N8N_PORT}:${N8N_PORT}"
     volumes:
       - n8n-data:/home/node/.n8n
       - ./n8n/workflows:/files/workflows
+      - ./scripts:/files/scripts:ro
+      - ./templates:/files/templates:ro
     healthcheck:
       test:
         - CMD-SHELL

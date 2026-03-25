@@ -5,7 +5,7 @@
 ## Composants
 
 - `Renovate` self-hosted exécute les scans de dépendances et ouvre des pull requests de mise à jour sur une allowlist explicite de dépôts.
-- `n8n` orchestre les déclenchements, les collectes de résultats et les envois de synthèse.
+- `n8n` orchestre les déclenchements, les collectes de résultats et les envois de synthèse via des workflows JSON versionnés dans le dépôt.
 - Les scripts du dossier `scripts/` préparent la collecte consolidée et l’envoi du résumé.
 - Les templates du dossier `templates/` fournissent la base HTML et texte brut des emails quotidiens.
 
@@ -16,6 +16,8 @@ Le démarrage se fait volontairement sur quelques dépôts seulement, via `RENOV
 Cycle cible :
 
 `scan -> PR -> CI GitHub -> synthèse email`
+
+Le premier workflow versionné couvre la chaîne `Cron -> contexte -> collecte -> synthèse -> email`.
 
 ## Démarrage rapide
 
@@ -50,6 +52,8 @@ Cycle cible :
 
 Les variables `N8N_BASIC_AUTH_*` restent documentées dans [`.env.example`](./.env.example) pour une protection future par reverse proxy, mais elles ne sont pas branchées sur la stack locale actuelle.
 
+Le workflow quotidien versionné se trouve dans [`n8n/workflows/repo-ops-daily-maintenance.json`](./n8n/workflows/repo-ops-daily-maintenance.json). Il nécessite encore une configuration manuelle du credential SMTP dans `n8n`.
+
 ## Structure du dépôt
 
 - [`docker-compose.yml`](./docker-compose.yml) décrit la stack locale.
@@ -59,6 +63,7 @@ Les variables `N8N_BASIC_AUTH_*` restent documentées dans [`.env.example`](./.e
 - [`docs/architecture.md`](./docs/architecture.md) décrit les responsabilités et les flux.
 - [`docs/rollout-plan.md`](./docs/rollout-plan.md) découpe l’adoption en phases.
 - [`n8n/README.md`](./n8n/README.md) précise l’usage prévu du dossier d’orchestration.
+- [`n8n/workflows/repo-ops-daily-maintenance.json`](./n8n/workflows/repo-ops-daily-maintenance.json) fournit un premier workflow quotidien importable.
 - Le dossier `scripts/` contient les placeholders de collecte et d’envoi.
 - Le dossier `templates/` contient les modèles de synthèse quotidiens.
 
@@ -72,6 +77,7 @@ docker compose config
 docker compose up -d --wait
 docker compose ps
 docker compose logs --tail=100 postgres n8n renovate
+docker compose exec n8n n8n import:workflow --input=/files/workflows/repo-ops-daily-maintenance.json
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\collect-results.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\send-summary.ps1
 docker compose exec postgres sh -lc 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'

@@ -1,0 +1,226 @@
+{
+  "name": "repo-ops - Maintenance quotidienne",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        180
+      ],
+      "id": "1f5f95ab-0a54-40c3-9d11-2bc1f9f9b201",
+      "name": "Déclenchement manuel"
+    },
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyDay",
+              "hour": 7,
+              "minute": 0
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        240,
+        360
+      ],
+      "id": "9e83ab04-8cd2-4378-8bc1-dfd839ca7e18",
+      "name": "Cron quotidien"
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = new Date();\nconst runDateDisplay = new Intl.DateTimeFormat(\"fr-FR\", {\n  dateStyle: \"full\",\n  timeStyle: \"short\",\n  timeZone: \"Europe/Paris\",\n}).format(now);\n\nreturn [\n  {\n    json: {\n      workflowName: \"repo-ops - maintenance quotidienne\",\n      runDateIso: now.toISOString(),\n      runDateDisplay,\n      collectCommand: \"sh /files/scripts/collect-results.sh --execute --format json\",\n      mailFrom: \"Repo Ops <a-configurer@example.com>\",\n      mailTo: \"a-configurer@example.com\",\n      workflowNotes: [\n        \"Configurer un credential SMTP sur le nœud Email Send après import.\",\n        \"Remplacer les adresses placeholder dans ce nœud avant activation.\"\n      ],\n      logMessages: [\n        \"[workflow] Contexte d'exécution préparé.\",\n        \"[workflow] Le script de collecte sera exécuté dans le conteneur n8n.\"\n      ]\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        270
+      ],
+      "id": "3f6fb758-4fef-4b22-a3f6-c983baf0d1d4",
+      "name": "Préparer le contexte"
+    },
+    {
+      "parameters": {
+        "executeOnce": true,
+        "command": "={{ $json.collectCommand }}"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        800,
+        270
+      ],
+      "id": "063bc172-c84e-4f6c-ac5e-49fdd5d31a27",
+      "name": "Collecter les résultats"
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $input.first().json;\nconst stdout = result.stdout ?? \"{}\";\nlet report;\n\ntry {\n  report = JSON.parse(stdout);\n} catch (error) {\n  throw new Error(`Impossible d'analyser la sortie JSON de collect-results : ${error.message}`);\n}\n\nreturn [\n  {\n    json: {\n      report,\n      collectExitCode: result.exitCode ?? 0,\n      collectStdout: result.stdout ?? \"\",\n      collectStderr: result.stderr ?? \"\",\n      logMessages: report.logMessages ?? []\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1060,
+        270
+      ],
+      "id": "4bb0b39f-e098-46ad-a932-0dd3ea767fb0",
+      "name": "Analyser les résultats"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1300,
+        270
+      ],
+      "id": "d0fd4d0d-cd48-4d93-92fe-ff81f367ec3c",
+      "name": "Fusionner le contexte et le rapport"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst report = data.report ?? {};\nconst scanned = report.scannedRepositories ?? [];\nconst created = report.createdPullRequests ?? [];\nconst merged = report.mergedPullRequests ?? [];\nconst failed = report.failedPullRequests ?? [];\nconst vulnerabilities = report.remainingVulnerabilities ?? [];\nconst actions = report.manualActions ?? [];\nconst logs = [...(data.logMessages ?? []), ...(report.logMessages ?? [])];\n\nconst escapeHtml = (value) => String(value)\n  .replace(/&/g, \"&amp;\")\n  .replace(/</g, \"&lt;\")\n  .replace(/>/g, \"&gt;\")\n  .replace(/\\\"/g, \"&quot;\")\n  .replace(/'/g, \"&#39;\");\n\nconst asTextLines = (values, fallback) =>\n  values.length > 0\n    ? values.map((value) => `- ${typeof value === \"string\" ? value : JSON.stringify(value)}`).join(\"\\n\")\n    : `- ${fallback}`;\n\nconst asHtmlList = (values, fallback) =>\n  values.length > 0\n    ? `<ul>${values\n        .map((value) => `<li>${escapeHtml(typeof value === \"string\" ? value : JSON.stringify(value))}</li>`)\n        .join(\"\")}</ul>`\n    : `<p>${escapeHtml(fallback)}</p>`;\n\nconst subject = `[repo-ops] Synthèse maintenance du ${data.runDateDisplay}`;\n\nconst text = [\n  `Synthèse quotidienne repo-ops`,\n  `Date d'exécution : ${data.runDateDisplay}`,\n  \"\",\n  \"Dépôts scannés\",\n  asTextLines(scanned, \"Aucun dépôt remonté par le placeholder.\"),\n  \"\",\n  \"PR créées\",\n  asTextLines(created, \"Aucune PR créée dans ce premier jet.\"),\n  \"\",\n  \"PR fusionnées\",\n  asTextLines(merged, \"Aucune PR fusionnée dans ce premier jet.\"),\n  \"\",\n  \"PR en échec\",\n  asTextLines(failed, \"Aucune PR en échec dans ce premier jet.\"),\n  \"\",\n  \"Vulnérabilités restantes\",\n  asTextLines(vulnerabilities, \"Aucune vulnérabilité remontée par le placeholder.\"),\n  \"\",\n  \"Actions manuelles recommandées\",\n  asTextLines(actions, \"Aucune action manuelle supplémentaire.\"),\n  \"\",\n  \"Journal d'exécution\",\n  asTextLines(logs, \"Aucun log supplémentaire.\")\n].join(\"\\n\");\n\nconst html = `\n  <html lang=\"fr\">\n    <body style=\"font-family: Arial, sans-serif; color: #172033; line-height: 1.5;\">\n      <h1>Synthèse quotidienne repo-ops</h1>\n      <p><strong>Date d'exécution :</strong> ${escapeHtml(data.runDateDisplay)}</p>\n      <h2>Dépôts scannés</h2>\n      ${asHtmlList(scanned, \"Aucun dépôt remonté par le placeholder.\")}\n      <h2>PR créées</h2>\n      ${asHtmlList(created, \"Aucune PR créée dans ce premier jet.\")}\n      <h2>PR fusionnées</h2>\n      ${asHtmlList(merged, \"Aucune PR fusionnée dans ce premier jet.\")}\n      <h2>PR en échec</h2>\n      ${asHtmlList(failed, \"Aucune PR en échec dans ce premier jet.\")}\n      <h2>Vulnérabilités restantes</h2>\n      ${asHtmlList(vulnerabilities, \"Aucune vulnérabilité remontée par le placeholder.\")}\n      <h2>Actions manuelles recommandées</h2>\n      ${asHtmlList(actions, \"Aucune action manuelle supplémentaire.\")}\n      <h2>Journal d'exécution</h2>\n      ${asHtmlList(logs, \"Aucun log supplémentaire.\")}\n    </body>\n  </html>\n`;\n\nreturn [\n  {\n    json: {\n      ...data,\n      emailSubject: subject,\n      emailText: text,\n      emailHtml: html,\n      executionLog: logs.join(\"\\n\")\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        270
+      ],
+      "id": "37939d50-9277-4bb5-a151-410d4696f577",
+      "name": "Générer la synthèse"
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $json.mailFrom }}",
+        "toEmail": "={{ $json.mailTo }}",
+        "subject": "={{ $json.emailSubject }}",
+        "emailFormat": "both",
+        "text": "={{ $json.emailText }}",
+        "html": "={{ $json.emailHtml }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1820,
+        270
+      ],
+      "id": "b3662d88-5efd-41f0-a984-a65c52532eb7",
+      "name": "Envoyer le récapitulatif",
+      "credentials": {}
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Déclenchement manuel": {
+      "main": [
+        [
+          {
+            "node": "Préparer le contexte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cron quotidien": {
+      "main": [
+        [
+          {
+            "node": "Préparer le contexte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer le contexte": {
+      "main": [
+        [
+          {
+            "node": "Collecter les résultats",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fusionner le contexte et le rapport",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collecter les résultats": {
+      "main": [
+        [
+          {
+            "node": "Analyser les résultats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyser les résultats": {
+      "main": [
+        [
+          {
+            "node": "Fusionner le contexte et le rapport",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Fusionner le contexte et le rapport": {
+      "main": [
+        [
+          {
+            "node": "Générer la synthèse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Générer la synthèse": {
+      "main": [
+        [
+          {
+            "node": "Envoyer le récapitulatif",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envoyer le récapitulatif": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Paris"
+  },
+  "versionId": "9fd7a815-f3d0-44eb-bbe6-4310d729ca15",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "id": "repoOpsDailyMaintenance",
+  "tags": []
+}

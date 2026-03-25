@@ -1,6 +1,6 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
-set -euo pipefail
+set -eu
 
 NO_OP=true
 REPORT_FILE="${REPORT_FILE:-reports/daily-summary.json}"
@@ -26,11 +26,12 @@ echo "[send-summary] Placeholder actif"
 echo "[send-summary] Rapport attendu : ${REPORT_FILE}"
 echo "[send-summary] Templates attendus : ${HTML_TEMPLATE} et ${TEXT_TEMPLATE}"
 echo "[send-summary] Destinataires SMTP attendus via SMTP_TO"
+echo "[send-summary] Dans le lot actuel, l'envoi réel est pris en charge en priorité par le workflow n8n"
 
 if [ "$NO_OP" = true ]; then
   echo "[send-summary] Mode sans effet de bord actif, aucun email n'est envoyé"
 else
-  echo "[send-summary] L'envoi réel n'est pas encore implémenté ; aucun email n'a été transmis"
+  echo "[send-summary] L'envoi CLI n'est pas encore implémenté ; aucun email n'a été transmis"
 fi
 
 exit 0

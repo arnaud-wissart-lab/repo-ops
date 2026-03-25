@@ -28,6 +28,9 @@ public sealed class PullRequestAutoMergeService(
             return evaluation with
             {
                 ActionStatus = PullRequestMergeActionStatus.NotAttempted,
+                Reasons = evaluation.Reasons
+                    .Concat(["Le feature flag d'exécution réelle de l'auto-merge est désactivé."])
+                    .ToArray(),
                 Summary = $"{evaluation.Summary} L'auto-merge exécutable est désactivé."
             };
         }
@@ -37,6 +40,9 @@ public sealed class PullRequestAutoMergeService(
             return evaluation with
             {
                 ActionStatus = PullRequestMergeActionStatus.DryRun,
+                Reasons = evaluation.Reasons
+                    .Concat(["Le mode dry-run est actif, aucun merge réel n'a été effectué."])
+                    .ToArray(),
                 Summary = $"{evaluation.Summary} Dry-run actif, aucun merge réel n'a été effectué."
             };
         }
@@ -47,7 +53,7 @@ public sealed class PullRequestAutoMergeService(
                 owner,
                 repositoryName,
                 evaluation.Number,
-                settings.MergeMethod,
+                evaluation.MergeMethod,
                 cancellationToken);
 
             if (mergeResult.Merged)
@@ -55,7 +61,10 @@ public sealed class PullRequestAutoMergeService(
                 return evaluation with
                 {
                     ActionStatus = PullRequestMergeActionStatus.Merged,
-                    Summary = $"{evaluation.Summary} Merge GitHub exécuté avec succès via la méthode {settings.MergeMethod}."
+                    Reasons = evaluation.Reasons
+                        .Concat([$"Le merge GitHub a été exécuté avec succès via la méthode {evaluation.MergeMethod}."])
+                        .ToArray(),
+                    Summary = $"{evaluation.Summary} Merge GitHub exécuté avec succès via la méthode {evaluation.MergeMethod}."
                 };
             }
 
@@ -63,6 +72,9 @@ public sealed class PullRequestAutoMergeService(
             {
                 Decision = MergeDecision.Failed,
                 ActionStatus = PullRequestMergeActionStatus.Failed,
+                Reasons = evaluation.Reasons
+                    .Concat([$"GitHub a répondu sans fusion effective : {mergeResult.Message}"])
+                    .ToArray(),
                 Summary = $"Le merge GitHub a répondu sans fusion effective : {mergeResult.Message}"
             };
         }
@@ -78,6 +90,9 @@ public sealed class PullRequestAutoMergeService(
             {
                 Decision = MergeDecision.Failed,
                 ActionStatus = PullRequestMergeActionStatus.Failed,
+                Reasons = evaluation.Reasons
+                    .Concat([$"La tentative de merge GitHub a échoué : {exception.Message}"])
+                    .ToArray(),
                 Summary = $"Le merge GitHub a échoué : {exception.Message}"
             };
         }

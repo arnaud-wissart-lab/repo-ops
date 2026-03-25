@@ -59,6 +59,7 @@ Dans l’état actuel, le worker :
 - qualifie les PR ouvertes en `readyForReview`, `blocked` ou `failedChecks` à partir des check-runs et du statut combiné ;
 - calcule une décision d’auto-merge par PR (`AutoMerge`, `ManualReview`, `Blocked`, `Failed`) ;
 - peut exécuter un merge GitHub réel si la politique est activée et si le mode dry-run est désactivé ;
+- peut appliquer des overrides par dépôt via une politique JSON simple ;
 - peut émettre le JSON sur `stdout` en mode explicite.
 
 ### Aspire AppHost
@@ -154,7 +155,24 @@ docker compose --profile maintenance run --rm renovate --version
 - mises à jour `major` en revue manuelle ;
 - mises à jour `minor` en revue manuelle tant qu’elles ne sont pas explicitement autorisées ;
 - mises à jour `patch` éligibles selon la politique configurée ;
+- `mergeable_state` accepté explicitement par la politique, avec `clean` par défaut ;
+- overrides par dépôt sur un matching exact `owner/repo` ;
 - mode dry-run actif par défaut.
+
+## Overrides par dépôt
+
+Le système distingue :
+
+- une politique globale, stricte par défaut ;
+- des overrides par dépôt, chargés depuis `RepoOps:AutoMerge:RepositoryPolicies` ou depuis un fichier JSON externe pointé par `AUTOMERGE_POLICY_FILE_PATH`.
+
+Chaque override peut :
+
+- autoriser ou interdire l’auto-merge ;
+- forcer une revue manuelle ;
+- déclarer un dépôt en lecture seule ;
+- restreindre les types de mise à jour autorisés ;
+- imposer une méthode de merge spécifique.
 
 ### Ce qui relève encore de n8n
 
@@ -170,6 +188,7 @@ docker compose --profile maintenance run --rm renovate --version
 - le type de version est déduit des labels GitHub ou du titre de PR quand la comparaison sémantique est possible ;
 - la qualification d’une exécution `Renovate` reste basée sur l’analyse de ses logs, pas sur un rapport structuré natif stabilisé ;
 - l’auto-merge réel reste conservateur et peut refuser des PR pourtant mergeables si le contexte GitHub n’est pas strictement `clean` ;
+- les overrides par dépôt ne prennent pas encore en charge des motifs globaux ou des groupes de dépôts ;
 - la détection des vulnérabilités n'est pas encore branchée ;
 - le déclenchement repose sur un fichier partagé simple ;
 - le worker reste pour l'instant en veille par scrutation légère ;

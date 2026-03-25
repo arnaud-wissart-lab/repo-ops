@@ -1,0 +1,23 @@
+{
+  "RepoOps": {
+    "AutoMerge": {
+      "RepositoryPolicies": [
+        {
+          "Repository": "owner/repo-pilote",
+          "AllowAutoMerge": true,
+          "ReviewRequired": false,
+          "ReadOnly": false,
+          "MergeMethod": "squash",
+          "AllowedUpdateTypes": [ "patch" ]
+        },
+        {
+          "Repository": "owner/repo-sensible",
+          "AllowAutoMerge": false,
+          "ReviewRequired": true,
+          "ReadOnly": true,
+          "AllowedUpdateTypes": []
+        }
+      ]
+    }
+  }
+}

@@ -85,12 +85,7 @@ public sealed class GitHubMaintenanceCollector(
                 failedPullRequests,
                 remainingVulnerabilities,
                 new PullRequestStatuses(),
-                new AutoMergeSummary
-                {
-                    Enabled = autoMergeOptions.Value.Enabled,
-                    DryRunEnabled = autoMergeOptions.Value.DryRunEnabled,
-                    MergeMethod = autoMergeOptions.Value.MergeMethod
-                },
+                CreateAutoMergeSummary(),
                 logs,
                 notes,
                 manualActions);
@@ -110,12 +105,7 @@ public sealed class GitHubMaintenanceCollector(
                 failedPullRequests,
                 remainingVulnerabilities,
                 new PullRequestStatuses(),
-                new AutoMergeSummary
-                {
-                    Enabled = autoMergeOptions.Value.Enabled,
-                    DryRunEnabled = autoMergeOptions.Value.DryRunEnabled,
-                    MergeMethod = autoMergeOptions.Value.MergeMethod
-                },
+                CreateAutoMergeSummary(),
                 logs,
                 notes,
                 manualActions);
@@ -292,24 +282,23 @@ public sealed class GitHubMaintenanceCollector(
             ClosedWithoutMerge = closedWithoutMerge
         };
 
-        var autoMerge = new AutoMergeSummary
-        {
-            Enabled = autoMergeOptions.Value.Enabled,
-            DryRunEnabled = autoMergeOptions.Value.DryRunEnabled,
-            MergeMethod = autoMergeOptions.Value.MergeMethod,
-            ReadyForMerge = readyForMerge,
-            ManualReviewPullRequests = manualReviewPullRequests,
-            BlockedPullRequests = blockedPullRequests,
-            FailedPullRequests = failedAutoMergePullRequests,
-            AutoMergedPullRequests = autoMergedPullRequests,
-            Evaluations = mergeEvaluations
-        };
+        var autoMerge = CreateAutoMergeSummary(
+            readyForMerge,
+            manualReviewPullRequests,
+            blockedPullRequests,
+            failedAutoMergePullRequests,
+            autoMergedPullRequests,
+            mergeEvaluations);
 
         notes.Add("La collecte des vulnérabilités reste non branchée dans cette étape et n'alimente pas encore les compteurs.");
         notes.Add("Le worker qualifie désormais les PR Renovate ouvertes selon les checks GitHub et les statuts combinés disponibles.");
         notes.Add("Les PR fermées sans fusion sont corrélées uniquement sur la fenêtre récente configurée.");
         notes.Add(
             $"La politique d'auto-merge analyse les PR Renovate selon les checks GitHub, la mergeabilité et le type de version. Types autorisés : {string.Join(", ", autoMergeOptions.Value.AllowedUpdateTypes)}. Dry-run : {(autoMergeOptions.Value.DryRunEnabled ? "actif" : "désactivé")}.");
+        if (!string.IsNullOrWhiteSpace(autoMergeOptions.Value.PolicyFilePath))
+        {
+            notes.Add($"Les overrides de dépôt sont recherchés dans le fichier de politique {autoMergeOptions.Value.PolicyFilePath}.");
+        }
 
         if (readyForReview.Count > 0)
         {
@@ -534,6 +523,31 @@ public sealed class GitHubMaintenanceCollector(
         };
     }
 
+    private AutoMergeSummary CreateAutoMergeSummary(
+        IReadOnlyList<string>? readyForMerge = null,
+        IReadOnlyList<string>? manualReviewPullRequests = null,
+        IReadOnlyList<string>? blockedPullRequests = null,
+        IReadOnlyList<string>? failedPullRequests = null,
+        IReadOnlyList<string>? autoMergedPullRequests = null,
+        IReadOnlyList<PullRequestMergeEvaluation>? evaluations = null)
+    {
+        return new AutoMergeSummary
+        {
+            PolicyFilePath = autoMergeOptions.Value.PolicyFilePath,
+            Enabled = autoMergeOptions.Value.Enabled,
+            DryRunEnabled = autoMergeOptions.Value.DryRunEnabled,
+            MergeMethod = autoMergeOptions.Value.MergeMethod,
+            AllowedUpdateTypes = autoMergeOptions.Value.AllowedUpdateTypes,
+            AllowedMergeableStates = autoMergeOptions.Value.AllowedMergeableStates,
+            ReadyForMerge = readyForMerge ?? Array.Empty<string>(),
+            ManualReviewPullRequests = manualReviewPullRequests ?? Array.Empty<string>(),
+            BlockedPullRequests = blockedPullRequests ?? Array.Empty<string>(),
+            FailedPullRequests = failedPullRequests ?? Array.Empty<string>(),
+            AutoMergedPullRequests = autoMergedPullRequests ?? Array.Empty<string>(),
+            Evaluations = evaluations ?? Array.Empty<PullRequestMergeEvaluation>()
+        };
+    }
+
     private static string ResolveStatus(
         int scannedRepositoryCount,
         int repositoryFailures,
@@ -610,7 +624,7 @@ public sealed class GitHubMaintenanceCollector(
             ? $"{evaluation.Repository}#{evaluation.Number}"
             : $"{evaluation.Repository}#{evaluation.Number} - {evaluation.HtmlUrl}";
 
-        return $"{location} ({FormatVersionType(evaluation.VersionType)}, checks {FormatChecksStatus(evaluation.ChecksStatus)}) - {evaluation.Summary}";
+        return $"{location} ({FormatVersionType(evaluation.VersionType)}, checks {FormatChecksStatus(evaluation.ChecksStatus)}, politique {evaluation.PolicySource}, merge {evaluation.MergeMethod}) - {evaluation.Summary}";
     }
 
     private static string FormatVersionType(PullRequestVersionType versionType)

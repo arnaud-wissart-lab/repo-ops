@@ -56,9 +56,15 @@ public sealed record PullRequestMergeEvaluation
 
     public string MergeableState { get; init; } = string.Empty;
 
+    public string MergeMethod { get; init; } = "squash";
+
+    public string PolicySource { get; init; } = "global";
+
     public MergeDecision Decision { get; init; } = MergeDecision.ManualReview;
 
     public PullRequestMergeActionStatus ActionStatus { get; init; } = PullRequestMergeActionStatus.NotAttempted;
+
+    public IReadOnlyList<string> Reasons { get; init; } = Array.Empty<string>();
 
     public string Summary { get; init; } = string.Empty;
 }

@@ -39,6 +39,7 @@ Déplacer progressivement la logique utile vers la couche `.NET`, tout en conser
 - qualification opérationnelle des PR Renovate dans le worker ;
 - supervision d’une exécution explicite de Renovate avec artefact de reporting dédié ;
 - politique d’auto-merge contrôlé et dry-run par défaut dans le worker ;
+- overrides simples par dépôt et tests unitaires sur la décision d’auto-merge ;
 - consolidation de résultats multi-repo ;
 - génération de synthèse plus complète ;
 - workflows `n8n` mieux alignés avec les sorties du worker ;
@@ -57,6 +58,7 @@ Déplacer progressivement la logique utile vers la couche `.NET`, tout en conser
 - le worker sait interroger GitHub sur un premier périmètre réel sans casser le contrat de sortie ;
 - le worker sait intégrer le dernier résultat connu d’une exécution explicite de Renovate sans déplacer cette logique dans `n8n` ;
 - le worker sait proposer ou exécuter un auto-merge contrôlé sans transférer la décision métier à `n8n` ;
+- la politique d’auto-merge peut être activée progressivement dépôt par dépôt avec dry-run par défaut ;
 - les scripts restants ont un rôle limité, explicite et documenté.
 
 ## Phase 3 - Superviseur IA

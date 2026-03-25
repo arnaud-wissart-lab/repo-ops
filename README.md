@@ -96,7 +96,8 @@ Le worker applique une politique simple et prudente :
 - la PR ne doit pas être en brouillon ;
 - GitHub doit indiquer `mergeable = true` et `mergeable_state = clean` ;
 - les mises à jour `major` restent en revue manuelle ;
-- par défaut, seules les mises à jour `patch` sont éligibles à l’auto-merge.
+- par défaut, seules les mises à jour `patch` sont éligibles à l’auto-merge ;
+- des overrides par dépôt peuvent restreindre ou autoriser explicitement la politique.
 
 La décision calculée pour chaque PR est l’une des suivantes :
 
@@ -106,6 +107,22 @@ La décision calculée pour chaque PR est l’une des suivantes :
 - `Failed`
 
 Le merge réel reste désactivé par défaut. Le système produit d’abord la décision et, si l’option est activée, peut ensuite exécuter le merge via l’API GitHub.
+
+### Overrides par dépôt
+
+Le mécanisme retenu reste simple :
+
+- politique globale via `RepoOps:AutoMerge` et les variables `AUTOMERGE_*` ;
+- overrides optionnels par dépôt via un fichier JSON pointé par `AUTOMERGE_POLICY_FILE_PATH` ;
+- exemple versionné : [automerge.policies.example.json](C:\Users\ArnaudW\source\repos\repo-ops\config\automerge.policies.example.json).
+
+Chaque override peut préciser :
+
+- `AllowAutoMerge`
+- `ReviewRequired`
+- `ReadOnly`
+- `AllowedUpdateTypes`
+- `MergeMethod`
 
 ## Exécution explicite de Renovate
 
@@ -146,8 +163,10 @@ docker compose --profile maintenance run --rm renovate --version
 - [`renovate/config.js`](./renovate/config.js) porte la configuration self-hosted d’administration.
 - [`docs/architecture.md`](./docs/architecture.md) décrit les responsabilités et les flux.
 - [`docs/rollout-plan.md`](./docs/rollout-plan.md) découpe l’adoption en phases.
+- [`config/automerge.policies.example.json`](C:\Users\ArnaudW\source\repos\repo-ops\config\automerge.policies.example.json) montre le format d’override par dépôt.
 - [`n8n/README.md`](./n8n/README.md) décrit le rôle des workflows et leur import.
 - [`n8n/workflows/repo-ops-daily-maintenance.json`](./n8n/workflows/repo-ops-daily-maintenance.json) fournit le workflow quotidien importable.
+- [`tests/RepoOps.Worker.Tests`](C:\Users\ArnaudW\source\repos\repo-ops\tests\RepoOps.Worker.Tests) couvre la logique métier d’auto-merge.
 - le dossier `scripts/` contient les passerelles et utilitaires transitoires ;
 - le dossier `templates/` contient les modèles historiques de synthèse et de tâches.
 
@@ -213,6 +232,7 @@ Cette couche Aspire sert au pilotage local. Pour les exécutions réelles de la 
 - le type de version utilisé pour la décision d’auto-merge est déduit des labels GitHub ou du titre de PR lorsqu’une comparaison sémantique est possible ;
 - l’auto-merge réel reste volontairement très conservateur : `mergeable_state = clean`, checks verts et politique explicite requise ;
 - le merge réel n’est tenté que si `AUTOMERGE_ENABLED=true` et `AUTOMERGE_DRY_RUN_ENABLED=false` ;
+- les overrides par dépôt reposent sur un matching exact `owner/repo` ;
 - l’exécution explicite de `Renovate` supervisée par le worker doit être lancée depuis l’hôte, pas depuis le conteneur `worker` ;
 - la qualification du run `Renovate` repose encore sur des heuristiques de logs `stdout` et `stderr` ;
 - la collecte des vulnérabilités reste encore placeholder ;
@@ -240,6 +260,7 @@ dotnet run --project .\src\RepoOps.Worker -- --run-once --run-renovate --emit-js
 $env:AUTOMERGE_ENABLED="true"
 $env:AUTOMERGE_DRY_RUN_ENABLED="true"
 dotnet run --project .\src\RepoOps.Worker -- --run-once --enable-auto-merge --emit-json-to-stdout --input-source=validation-automerge
+dotnet test .\RepoOps.sln
 docker compose --profile maintenance run --rm renovate --version
 docker compose down
 ```
@@ -281,6 +302,27 @@ $env:AUTOMERGE_ALLOWED_UPDATE_TYPES="patch"
 dotnet run --project .\src\RepoOps.Worker -- --run-once --enable-auto-merge --disable-auto-merge-dry-run --emit-json-to-stdout --input-source=test-automerge-reel
 ```
 
+Exemple d’override par dépôt :
+
+```json
+{
+  "RepoOps": {
+    "AutoMerge": {
+      "RepositoryPolicies": [
+        {
+          "Repository": "owner/repo-pilote",
+          "AllowAutoMerge": true,
+          "ReviewRequired": false,
+          "ReadOnly": false,
+          "MergeMethod": "squash",
+          "AllowedUpdateTypes": [ "patch" ]
+        }
+      ]
+    }
+  }
+}
+```
+
 Exemple de statut attendu en sortie :
 
 ```json
@@ -296,15 +338,25 @@ Exemple de statut attendu en sortie :
     "command": "docker compose --profile maintenance run --rm renovate"
   },
   "autoMerge": {
+    "policyFilePath": "config/automerge.policies.json",
     "enabled": false,
     "dryRunEnabled": true,
     "mergeMethod": "squash",
+    "allowedUpdateTypes": [ "patch" ],
+    "allowedMergeableStates": [ "clean" ],
     "readyForMerge": [],
     "manualReviewPullRequests": [],
     "blockedPullRequests": [],
     "failedPullRequests": [],
     "autoMergedPullRequests": [],
-    "evaluations": []
+    "evaluations": [
+      {
+        "repository": "owner/repo-a",
+        "decision": "ManualReview",
+        "policySource": "repository:owner/repo-a",
+        "reasons": []
+      }
+    ]
   },
   "pullRequestStatuses": {
     "readyForReview": [],

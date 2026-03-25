@@ -41,6 +41,9 @@ public sealed class MaintenanceDigestRenderer
         builder.AppendLine($"- Activé : {(report.AutoMerge.Enabled ? "oui" : "non")}");
         builder.AppendLine($"- Dry-run : {(report.AutoMerge.DryRunEnabled ? "oui" : "non")}");
         builder.AppendLine($"- Méthode de merge : {report.AutoMerge.MergeMethod}");
+        builder.AppendLine($"- Types de version autorisés : {FormatJoinedValues(report.AutoMerge.AllowedUpdateTypes)}");
+        builder.AppendLine($"- États mergeables acceptés : {FormatJoinedValues(report.AutoMerge.AllowedMergeableStates)}");
+        builder.AppendLine($"- Fichier de politique : {FormatOptionalValue(report.AutoMerge.PolicyFilePath)}");
         builder.AppendLine();
         builder.AppendLine("Compteurs :");
         builder.AppendLine($"- PR créées : {report.Summary.Counts.CreatedPullRequests}");
@@ -101,6 +104,12 @@ public sealed class MaintenanceDigestRenderer
             "PR en échec d'auto-merge",
             report.AutoMerge.FailedPullRequests,
             "Aucun échec d'auto-merge.");
+        builder.AppendLine();
+        AppendSection(
+            builder,
+            "Décisions d'auto-merge détaillées",
+            SelectAutoMergeDecisionLines(report.AutoMerge.Evaluations),
+            "Aucune décision détaillée disponible.");
         builder.AppendLine();
         builder.AppendLine("Actions manuelles recommandées :");
 
@@ -168,6 +177,9 @@ public sealed class MaintenanceDigestRenderer
                       <li>Activé : {Escape(report.AutoMerge.Enabled ? "oui" : "non")}</li>
                       <li>Dry-run : {Escape(report.AutoMerge.DryRunEnabled ? "oui" : "non")}</li>
                       <li>Méthode de merge : {Escape(report.AutoMerge.MergeMethod)}</li>
+                      <li>Types de version autorisés : {Escape(FormatJoinedValues(report.AutoMerge.AllowedUpdateTypes))}</li>
+                      <li>États mergeables acceptés : {Escape(FormatJoinedValues(report.AutoMerge.AllowedMergeableStates))}</li>
+                      <li>Fichier de politique : {Escape(FormatOptionalValue(report.AutoMerge.PolicyFilePath))}</li>
                     </ul>
                     <h2>Compteurs</h2>
                     <ul>
@@ -194,6 +206,8 @@ public sealed class MaintenanceDigestRenderer
                     {RenderList(report.AutoMerge.AutoMergedPullRequests, "Aucune PR auto-mergée dans ce cycle.")}
                     <h2>PR en échec d'auto-merge</h2>
                     {RenderList(report.AutoMerge.FailedPullRequests, "Aucun échec d'auto-merge.")}
+                    <h2>Décisions d'auto-merge détaillées</h2>
+                    {RenderList(SelectAutoMergeDecisionLines(report.AutoMerge.Evaluations), "Aucune décision détaillée disponible.")}
                     <h2>Actions manuelles recommandées</h2>
                     {RenderList(report.Recommendations.ManualActions, "Aucune action manuelle supplémentaire.")}
                     <h2>Notes</h2>
@@ -225,6 +239,16 @@ public sealed class MaintenanceDigestRenderer
         return value?.ToString("O") ?? "non disponible";
     }
 
+    private static string FormatJoinedValues(IReadOnlyList<string> values)
+    {
+        return values.Count == 0 ? "aucun" : string.Join(", ", values);
+    }
+
+    private static string FormatOptionalValue(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "non configuré" : value;
+    }
+
     private static IReadOnlyList<string> SelectInterestingRenovateLines(
         IReadOnlyList<string> logs,
         IReadOnlyList<string> errors)
@@ -232,6 +256,16 @@ public sealed class MaintenanceDigestRenderer
         return logs
             .Concat(errors.Select(error => $"stderr: {error}"))
             .Take(8)
+            .ToArray();
+    }
+
+    private static IReadOnlyList<string> SelectAutoMergeDecisionLines(
+        IReadOnlyList<PullRequestMergeEvaluation> evaluations)
+    {
+        return evaluations
+            .Select(evaluation =>
+                $"{evaluation.Repository}#{evaluation.Number} - décision {evaluation.Decision}, action {evaluation.ActionStatus}, politique {evaluation.PolicySource}, raisons : {string.Join(" ", evaluation.Reasons)}")
+            .Take(10)
             .ToArray();
     }
 

@@ -14,7 +14,9 @@ services:
       AUTOMERGE_ENABLED: ${AUTOMERGE_ENABLED}
       AUTOMERGE_DRY_RUN_ENABLED: ${AUTOMERGE_DRY_RUN_ENABLED}
       AUTOMERGE_ALLOWED_UPDATE_TYPES: ${AUTOMERGE_ALLOWED_UPDATE_TYPES}
+      AUTOMERGE_ALLOWED_MERGEABLE_STATES: ${AUTOMERGE_ALLOWED_MERGEABLE_STATES}
       AUTOMERGE_MERGE_METHOD: ${AUTOMERGE_MERGE_METHOD}
+      AUTOMERGE_POLICY_FILE_PATH: ${AUTOMERGE_POLICY_FILE_PATH}
       RepoOps__Worker__ContinuousModeEnabled: "true"
       RepoOps__Worker__RunOnStartup: "false"
       RepoOps__Worker__LoopIntervalSeconds: ${WORKER_LOOP_INTERVAL_SECONDS}
@@ -27,6 +29,7 @@ services:
     volumes:
       - ./reports:/app/reports
       - ./runtime:/app/runtime
+      - ./config:/app/config:ro
     healthcheck:
       test: ["CMD-SHELL", "grep -aq 'RepoOps.Worker.dll' /proc/1/cmdline"]
       interval: 30s

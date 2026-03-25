@@ -5,6 +5,7 @@ using RepoOps.Worker.Services;
 
 var builder = Host.CreateApplicationBuilder(ParsePassthroughArguments(args));
 builder.Configuration.AddInMemoryCollection(ParseWorkerOverrides(args));
+AddOptionalAutoMergePolicyFile(builder.Configuration);
 builder.Logging.SetMinimumLevel(ResolveLogLevel(builder.Configuration["LOG_LEVEL"]));
 builder.Services.Configure<RepoOpsWorkerOptions>(
     builder.Configuration.GetSection(RepoOpsWorkerOptions.SectionName));
@@ -43,11 +44,19 @@ builder.Services.AddOptions<AutoMergeOptions>()
         }
 
         options.MergeMethod = configuration["AUTOMERGE_MERGE_METHOD"] ?? options.MergeMethod;
+        options.PolicyFilePath = configuration["AUTOMERGE_POLICY_FILE_PATH"] ?? options.PolicyFilePath;
 
         var allowedUpdateTypes = configuration["AUTOMERGE_ALLOWED_UPDATE_TYPES"];
         if (!string.IsNullOrWhiteSpace(allowedUpdateTypes))
         {
             options.AllowedUpdateTypes = allowedUpdateTypes
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        }
+
+        var allowedMergeableStates = configuration["AUTOMERGE_ALLOWED_MERGEABLE_STATES"];
+        if (!string.IsNullOrWhiteSpace(allowedMergeableStates))
+        {
+            options.AllowedMergeableStates = allowedMergeableStates
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         }
     });
@@ -89,11 +98,24 @@ static LogLevel ResolveLogLevel(string? value) => value?.ToLowerInvariant() swit
     _ => LogLevel.Information
 };
 
+static void AddOptionalAutoMergePolicyFile(ConfigurationManager configuration)
+{
+    var configuredPath = configuration["AUTOMERGE_POLICY_FILE_PATH"];
+
+    if (string.IsNullOrWhiteSpace(configuredPath))
+    {
+        return;
+    }
+
+    configuration.AddJsonFile(configuredPath, optional: true, reloadOnChange: false);
+}
+
 static string[] ParsePassthroughArguments(IEnumerable<string> args) =>
     args.Where(arg => !arg.StartsWith("--run-once", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--run-renovate", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--enable-auto-merge", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--disable-auto-merge-dry-run", StringComparison.OrdinalIgnoreCase)
+        && !arg.StartsWith("--automerge-policy-file=", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--emit-json-to-stdout", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--input-source=", StringComparison.OrdinalIgnoreCase))
         .ToArray();
@@ -126,6 +148,13 @@ static Dictionary<string, string?> ParseWorkerOverrides(IEnumerable<string> args
         if (string.Equals(arg, "--disable-auto-merge-dry-run", StringComparison.OrdinalIgnoreCase))
         {
             overrides["RepoOps:AutoMerge:DryRunEnabled"] = "false";
+            continue;
+        }
+
+        const string autoMergePolicyFilePrefix = "--automerge-policy-file=";
+        if (arg.StartsWith(autoMergePolicyFilePrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            overrides["AUTOMERGE_POLICY_FILE_PATH"] = arg[autoMergePolicyFilePrefix.Length..];
             continue;
         }
 

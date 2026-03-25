@@ -8,6 +8,8 @@ public sealed class MaintenanceRunReport
 
     public PullRequestStatuses PullRequestStatuses { get; init; } = new();
 
+    public VulnerabilitySummary Vulnerabilities { get; init; } = new();
+
     public AutoMergeSummary AutoMerge { get; init; } = new();
 
     public MaintenanceDigest Digest { get; init; } = new();

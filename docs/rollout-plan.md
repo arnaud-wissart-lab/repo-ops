@@ -37,6 +37,7 @@ Déplacer progressivement la logique utile vers la couche `.NET`, tout en conser
 
 - collecte GitHub structurée dans le worker ;
 - qualification opérationnelle des PR Renovate dans le worker ;
+- collecte de vulnérabilités via les `Dependabot alerts` GitHub ;
 - supervision d’une exécution explicite de Renovate avec artefact de reporting dédié ;
 - politique d’auto-merge contrôlé et dry-run par défaut dans le worker ;
 - overrides simples par dépôt et tests unitaires sur la décision d’auto-merge ;

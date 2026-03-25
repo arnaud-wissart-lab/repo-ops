@@ -44,7 +44,7 @@ Par défaut, il démarre :
 - future base pour la supervision.
 
 Dans ce lot, le worker devient la source de vérité du reporting et interroge réellement GitHub pour une première collecte ciblée.
-Il calcule également des décisions d’auto-merge contrôlé sur les PR Renovate ouvertes.
+Il calcule également des décisions d’auto-merge contrôlé sur les PR Renovate ouvertes et collecte une première vue des vulnérabilités via les `Dependabot alerts`.
 
 ### Aspire AppHost
 
@@ -83,7 +83,7 @@ Le dossier `scripts/` reste présent pour la transition, mais il ne fait plus pa
    - [`worker-summary.txt`](./reports/worker-summary.txt)
    - [`worker-summary.html`](./reports/worker-summary.html)
    - [`renovate-execution.json`](./reports/renovate-execution.json) lorsqu'une exécution explicite de `Renovate` est lancée via le worker
-   Le worker interroge GitHub avec `GITHUB_TOKEN` pour récupérer les PR Renovate ouvertes, les PR Renovate fusionnées récemment, les fermetures sans fusion récentes, les checks utiles à la qualification opérationnelle et les informations nécessaires à une décision d’auto-merge contrôlé.
+   Le worker interroge GitHub avec `GITHUB_TOKEN` pour récupérer les PR Renovate ouvertes, les PR Renovate fusionnées récemment, les fermetures sans fusion récentes, les checks utiles à la qualification opérationnelle, les `Dependabot alerts` ouvertes et corrigées quand elles sont disponibles, ainsi que les informations nécessaires à une décision d’auto-merge contrôlé.
 5. `n8n` supprime d'abord les anciens artefacts, puis lit le JSON frais produit par le worker.
 6. `n8n` envoie l’email en réutilisant directement le sujet, le texte et le HTML déjà préparés.
 
@@ -123,6 +123,18 @@ Chaque override peut préciser :
 - `ReadOnly`
 - `AllowedUpdateTypes`
 - `MergeMethod`
+
+## Couche sécurité
+
+Le worker collecte une première vue des vulnérabilités connues via les `Dependabot alerts` GitHub :
+
+- nombre d’alertes ouvertes ;
+- nombre d’alertes corrigées si l’API les expose ;
+- répartition par sévérité `critical`, `high`, `medium` et `low` ;
+- liste d’alertes importantes visibles immédiatement dans le digest ;
+- corrélation prudente avec certaines PR Renovate quand le package et une version corrigée connue sont visibles de manière fiable.
+
+Cette corrélation est volontairement conservatrice. Si l’information n’est pas assez sûre, la PR n’est pas marquée comme corrective.
 
 ## Exécution explicite de Renovate
 
@@ -180,6 +192,7 @@ docker compose --profile maintenance run --rm renovate --version
 
 2. Définir au minimum :
    - `GITHUB_TOKEN`
+     Ce jeton doit aussi permettre la lecture des `Dependabot alerts` si vous voulez enrichir la section sécurité.
    - `GITHUB_API_BASE_URL` si vous ciblez autre chose que `github.com`
    - `GITHUB_RECENT_MERGED_WINDOW_DAYS` si vous voulez ajuster la fenêtre des fusions récentes
    - `RENOVATE_REPOSITORIES`
@@ -225,17 +238,18 @@ Cette couche Aspire sert au pilotage local. Pour les exécutions réelles de la 
 ## Limites actuelles
 
 - le worker interroge désormais GitHub, mais seulement sur un premier périmètre REST limité ;
+- la couche sécurité dépend des `Dependabot alerts` exposées par l’API GitHub et des permissions effectives du jeton ;
 - les PR ouvertes sont comptées à partir des PR Renovate détectées, pas à partir d’un historique d’exécution `Renovate` propre au dépôt ;
 - les PR fusionnées sont lues dans une fenêtre glissante configurable, limitée au dernier lot de PR fermées renvoyé par l’API ;
 - la qualification des PR ouvertes repose sur la combinaison des check-runs et du statut combiné GitHub sur la tête de PR ;
 - les PR sans check décisif sont classées dans `pullRequestStatuses.blocked` avec une qualification incomplète ;
 - le type de version utilisé pour la décision d’auto-merge est déduit des labels GitHub ou du titre de PR lorsqu’une comparaison sémantique est possible ;
+- la corrélation entre PR Renovate et vulnérabilité reste volontairement stricte et peut manquer des cas pourtant pertinents ;
 - l’auto-merge réel reste volontairement très conservateur : `mergeable_state = clean`, checks verts et politique explicite requise ;
 - le merge réel n’est tenté que si `AUTOMERGE_ENABLED=true` et `AUTOMERGE_DRY_RUN_ENABLED=false` ;
 - les overrides par dépôt reposent sur un matching exact `owner/repo` ;
 - l’exécution explicite de `Renovate` supervisée par le worker doit être lancée depuis l’hôte, pas depuis le conteneur `worker` ;
 - la qualification du run `Renovate` repose encore sur des heuristiques de logs `stdout` et `stderr` ;
-- la collecte des vulnérabilités reste encore placeholder ;
 - le déclenchement de maintenance repose encore sur un fichier partagé simple ;
 - le worker fonctionne encore en veille par scrutation légère, pas via une API dédiée ;
 - la configuration SMTP et les destinataires restent à finaliser manuellement dans `n8n` ;
@@ -329,6 +343,19 @@ Exemple de statut attendu en sortie :
 {
   "summary": {
     "status": "Success|Partial|Failed"
+  },
+  "vulnerabilities": {
+    "status": "Available|Partial|Unavailable",
+    "openAlerts": 0,
+    "fixedAlerts": 0,
+    "criticalCount": 0,
+    "highCount": 0,
+    "mediumCount": 0,
+    "lowCount": 0,
+    "prioritizedPullRequests": [],
+    "importantAlerts": [],
+    "notes": [],
+    "repositories": []
   },
   "renovateExecution": {
     "status": "NotTriggered|Succeeded|NoUpdatesDetected|PullRequestsUpdated|Failed",

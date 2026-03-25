@@ -11,4 +11,6 @@ public sealed class MaintenanceCounts
     public int FailedPullRequests { get; init; }
 
     public int RemainingVulnerabilities { get; init; }
+
+    public int FixedVulnerabilities { get; init; }
 }

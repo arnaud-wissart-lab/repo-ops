@@ -56,6 +56,9 @@ Dans l’état actuel, le worker :
 - sépare les modèles métier, le rendu du digest et la persistance ;
 - génère un sujet, un texte brut et un HTML simples ;
 - récupère les PR Renovate ouvertes, les PR Renovate fusionnées récemment et les fermetures récentes sans fusion ;
+- récupère les `Dependabot alerts` ouvertes et corrigées quand l’API GitHub les rend disponibles ;
+- construit une vue sécurité par dépôt avec les sévérités `critical`, `high`, `medium` et `low` ;
+- corrèle de façon prudente certaines PR Renovate avec des vulnérabilités ouvertes lorsque le package et la version corrigée sont identifiables ;
 - qualifie les PR ouvertes en `readyForReview`, `blocked` ou `failedChecks` à partir des check-runs et du statut combiné ;
 - calcule une décision d’auto-merge par PR (`AutoMerge`, `ManualReview`, `Blocked`, `Failed`) ;
 - peut exécuter un merge GitHub réel si la politique est activée et si le mode dry-run est désactivé ;
@@ -141,6 +144,7 @@ docker compose --profile maintenance run --rm renovate --version
 - porter la logique métier de collecte GitHub, consolidation et synthèse ;
 - produire le contrat de sortie de référence ;
 - qualifier les PR Renovate pour aider la décision opérationnelle ;
+- intégrer une première couche de reporting sécurité à partir des `Dependabot alerts` ;
 - décider si une PR Renovate doit être auto-mergée, revue manuellement ou bloquée ;
 - exécuter éventuellement le merge GitHub réel dans un mode explicitement activé ;
 - superviser l’exécution explicite de `Renovate` et en conserver un artefact exploitable ;
@@ -184,12 +188,14 @@ Chaque override peut :
 ## Limites actuelles
 
 - la collecte GitHub reste limitée au périmètre REST minimal utile à ce lot ;
+- la lecture des `Dependabot alerts` dépend des droits du jeton GitHub et peut être indisponible selon les dépôts ciblés ;
+- les alertes corrigées dépendent de ce que l’API GitHub expose effectivement pour le dépôt ;
+- la corrélation d’une PR Renovate avec une vulnérabilité reste volontairement stricte et peut manquer des cas pourtant pertinents ;
 - la qualification des PR ouvertes dépend encore de la disponibilité des check-runs et du statut combiné sur chaque dépôt ;
 - le type de version est déduit des labels GitHub ou du titre de PR quand la comparaison sémantique est possible ;
 - la qualification d’une exécution `Renovate` reste basée sur l’analyse de ses logs, pas sur un rapport structuré natif stabilisé ;
 - l’auto-merge réel reste conservateur et peut refuser des PR pourtant mergeables si le contexte GitHub n’est pas strictement `clean` ;
 - les overrides par dépôt ne prennent pas encore en charge des motifs globaux ou des groupes de dépôts ;
-- la détection des vulnérabilités n'est pas encore branchée ;
 - le déclenchement repose sur un fichier partagé simple ;
 - le worker reste pour l'instant en veille par scrutation légère ;
 - l'intégration GitHub n'exploite pas encore les issues, les dépendances de sécurité ni l'historique détaillé d'exécution de Renovate ;

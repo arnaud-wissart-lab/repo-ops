@@ -10,6 +10,8 @@ public sealed class GitHubPullRequestDto
 
     public string Title { get; init; } = string.Empty;
 
+    public string Body { get; init; } = string.Empty;
+
     public string HtmlUrl { get; init; } = string.Empty;
 
     public bool Draft { get; init; }

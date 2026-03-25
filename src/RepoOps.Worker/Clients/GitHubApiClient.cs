@@ -70,6 +70,17 @@ public sealed class GitHubApiClient(
         return SendAsync<GitHubMergePullRequestResponseDto>(HttpMethod.Put, uri, payload, cancellationToken)!;
     }
 
+    public async Task<IReadOnlyList<GitHubDependabotAlertDto>> GetDependabotAlertsAsync(
+        string owner,
+        string repository,
+        string state,
+        CancellationToken cancellationToken)
+    {
+        var uri = $"repos/{owner}/{repository}/dependabot/alerts?state={Uri.EscapeDataString(state)}&per_page=100";
+        var alerts = await GetAsync<List<GitHubDependabotAlertDto>>(uri, cancellationToken);
+        return alerts ?? [];
+    }
+
     private async Task<T?> GetAsync<T>(string relativeUri, CancellationToken cancellationToken)
     {
         return await SendAsync<T>(HttpMethod.Get, relativeUri, payload: null, cancellationToken);

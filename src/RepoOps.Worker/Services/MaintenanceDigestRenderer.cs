@@ -50,6 +50,34 @@ public sealed class MaintenanceDigestRenderer
         builder.AppendLine($"- PR fusionnées : {report.Summary.Counts.MergedPullRequests}");
         builder.AppendLine($"- PR en échec : {report.Summary.Counts.FailedPullRequests}");
         builder.AppendLine($"- Vulnérabilités restantes : {report.Summary.Counts.RemainingVulnerabilities}");
+        builder.AppendLine($"- Vulnérabilités corrigées : {report.Summary.Counts.FixedVulnerabilities}");
+        builder.AppendLine();
+        builder.AppendLine("Sécurité :");
+        builder.AppendLine($"- Statut de collecte : {report.Vulnerabilities.Status}");
+        builder.AppendLine($"- Alertes ouvertes : {report.Vulnerabilities.OpenAlerts}");
+        builder.AppendLine($"- Alertes corrigées : {report.Vulnerabilities.FixedAlerts}");
+        builder.AppendLine($"- Critiques : {report.Vulnerabilities.CriticalCount}");
+        builder.AppendLine($"- Élevées : {report.Vulnerabilities.HighCount}");
+        builder.AppendLine($"- Moyennes : {report.Vulnerabilities.MediumCount}");
+        builder.AppendLine($"- Faibles : {report.Vulnerabilities.LowCount}");
+        builder.AppendLine();
+        AppendSection(
+            builder,
+            "PR prioritaires liées à la sécurité",
+            report.Vulnerabilities.PrioritizedPullRequests,
+            "Aucune PR prioritaire liée à une vulnérabilité ouverte.");
+        builder.AppendLine();
+        AppendSection(
+            builder,
+            "Alertes de sécurité importantes",
+            report.Vulnerabilities.ImportantAlerts,
+            "Aucune alerte critique ou élevée visible.");
+        builder.AppendLine();
+        AppendSection(
+            builder,
+            "Notes de sécurité",
+            report.Vulnerabilities.Notes,
+            "Aucune note de sécurité complémentaire.");
         builder.AppendLine();
         AppendSection(
             builder,
@@ -187,7 +215,24 @@ public sealed class MaintenanceDigestRenderer
                       <li>PR fusionnées : {report.Summary.Counts.MergedPullRequests}</li>
                       <li>PR en échec : {report.Summary.Counts.FailedPullRequests}</li>
                       <li>Vulnérabilités restantes : {report.Summary.Counts.RemainingVulnerabilities}</li>
+                      <li>Vulnérabilités corrigées : {report.Summary.Counts.FixedVulnerabilities}</li>
                     </ul>
+                    <h2>Sécurité</h2>
+                    <ul>
+                      <li>Statut de collecte : {Escape(report.Vulnerabilities.Status)}</li>
+                      <li>Alertes ouvertes : {report.Vulnerabilities.OpenAlerts}</li>
+                      <li>Alertes corrigées : {report.Vulnerabilities.FixedAlerts}</li>
+                      <li>Critiques : {report.Vulnerabilities.CriticalCount}</li>
+                      <li>Élevées : {report.Vulnerabilities.HighCount}</li>
+                      <li>Moyennes : {report.Vulnerabilities.MediumCount}</li>
+                      <li>Faibles : {report.Vulnerabilities.LowCount}</li>
+                    </ul>
+                    <h2>PR prioritaires liées à la sécurité</h2>
+                    {RenderList(report.Vulnerabilities.PrioritizedPullRequests, "Aucune PR prioritaire liée à une vulnérabilité ouverte.")}
+                    <h2>Alertes de sécurité importantes</h2>
+                    {RenderList(report.Vulnerabilities.ImportantAlerts, "Aucune alerte critique ou élevée visible.")}
+                    <h2>Notes de sécurité</h2>
+                    {RenderList(report.Vulnerabilities.Notes, "Aucune note de sécurité complémentaire.")}
                     <h2>PR prêtes à traiter</h2>
                     {RenderList(report.PullRequestStatuses.ReadyForReview, "Aucune PR prête à traiter.")}
                     <h2>PR bloquées ou en attente</h2>

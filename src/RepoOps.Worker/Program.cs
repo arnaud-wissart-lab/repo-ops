@@ -74,6 +74,7 @@ builder.Services.AddOptions<GitHubOptions>()
     });
 builder.Services.AddHttpClient<GitHubApiClient>();
 builder.Services.AddSingleton<GitHubMaintenanceCollector>();
+builder.Services.AddSingleton<VulnerabilityAssessmentService>();
 builder.Services.AddSingleton<PullRequestDecisionService>();
 builder.Services.AddSingleton<PullRequestAutoMergeService>();
 builder.Services.AddSingleton<RenovateExecutionService>();

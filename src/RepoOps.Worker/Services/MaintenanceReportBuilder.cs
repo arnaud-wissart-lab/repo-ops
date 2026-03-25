@@ -78,11 +78,13 @@ public sealed class MaintenanceReportBuilder(
                     CreatedPullRequests = collectionResult.CreatedPullRequests.Count,
                     MergedPullRequests = collectionResult.MergedPullRequests.Count,
                     FailedPullRequests = collectionResult.FailedPullRequests.Count,
-                    RemainingVulnerabilities = collectionResult.RemainingVulnerabilities.Count
+                    RemainingVulnerabilities = collectionResult.Vulnerabilities.OpenAlerts,
+                    FixedVulnerabilities = collectionResult.Vulnerabilities.FixedAlerts
                 }
             },
             RenovateExecution = renovateExecution,
             PullRequestStatuses = collectionResult.PullRequestStatuses,
+            Vulnerabilities = collectionResult.Vulnerabilities,
             AutoMerge = collectionResult.AutoMerge,
             Messages = new MaintenanceMessages
             {

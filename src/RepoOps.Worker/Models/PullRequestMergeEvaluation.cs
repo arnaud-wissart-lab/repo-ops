@@ -60,6 +60,12 @@ public sealed record PullRequestMergeEvaluation
 
     public string PolicySource { get; init; } = "global";
 
+    public bool IsSecurityUpdate { get; init; }
+
+    public string SecuritySeverity { get; init; } = string.Empty;
+
+    public IReadOnlyList<string> MatchedVulnerabilities { get; init; } = Array.Empty<string>();
+
     public MergeDecision Decision { get; init; } = MergeDecision.ManualReview;
 
     public PullRequestMergeActionStatus ActionStatus { get; init; } = PullRequestMergeActionStatus.NotAttempted;

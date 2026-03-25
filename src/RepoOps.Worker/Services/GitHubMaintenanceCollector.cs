@@ -10,6 +10,7 @@ public sealed class GitHubMaintenanceCollector(
     GitHubApiClient gitHubApiClient,
     IOptions<GitHubOptions> options,
     IOptions<AutoMergeOptions> autoMergeOptions,
+    VulnerabilityAssessmentService vulnerabilityAssessmentService,
     PullRequestDecisionService pullRequestDecisionService,
     PullRequestAutoMergeService pullRequestAutoMergeService,
     ILogger<GitHubMaintenanceCollector> logger)
@@ -67,6 +68,9 @@ public sealed class GitHubMaintenanceCollector(
         var failedAutoMergePullRequests = new List<string>();
         var autoMergedPullRequests = new List<string>();
         var mergeEvaluations = new List<PullRequestMergeEvaluation>();
+        var repositoryVulnerabilitySummaries = new List<RepositoryVulnerabilitySummary>();
+        var prioritizedSecurityPullRequests = new List<string>();
+        var vulnerabilityNotes = new List<string>();
         var repositoryFailures = 0;
         var autoMergeFailures = 0;
         var partialDataDetected = false;
@@ -85,6 +89,10 @@ public sealed class GitHubMaintenanceCollector(
                 failedPullRequests,
                 remainingVulnerabilities,
                 new PullRequestStatuses(),
+                vulnerabilityAssessmentService.BuildGlobalSummary(
+                    repositoryVulnerabilitySummaries,
+                    prioritizedSecurityPullRequests,
+                    ["Aucun dépôt n'est configuré, la collecte des vulnérabilités est indisponible."]),
                 CreateAutoMergeSummary(),
                 logs,
                 notes,
@@ -105,6 +113,10 @@ public sealed class GitHubMaintenanceCollector(
                 failedPullRequests,
                 remainingVulnerabilities,
                 new PullRequestStatuses(),
+                vulnerabilityAssessmentService.BuildGlobalSummary(
+                    repositoryVulnerabilitySummaries,
+                    prioritizedSecurityPullRequests,
+                    ["Le jeton GitHub est absent, la collecte des vulnérabilités est indisponible."]),
                 CreateAutoMergeSummary(),
                 logs,
                 notes,
@@ -153,6 +165,18 @@ public sealed class GitHubMaintenanceCollector(
                     .Where(pullRequest => pullRequest.MergedAt is null && pullRequest.ClosedAt is not null && pullRequest.ClosedAt >= recentThreshold)
                     .ToList();
 
+                var vulnerabilityFetch = await CollectVulnerabilitiesAsync(
+                    repository,
+                    owner,
+                    repositoryName,
+                    cancellationToken);
+
+                partialDataDetected |= vulnerabilityFetch.IsPartial;
+                logs.AddRange(vulnerabilityFetch.Logs);
+                vulnerabilityNotes.AddRange(vulnerabilityFetch.RepositorySummary.Notes);
+                repositoryVulnerabilitySummaries.Add(vulnerabilityFetch.RepositorySummary);
+                remainingVulnerabilities.AddRange(vulnerabilityFetch.RepositorySummary.OpenAlertDetails);
+
                 foreach (var pullRequest in openRenovatePullRequests)
                 {
                     var display = FormatPullRequest(repository, pullRequest);
@@ -194,6 +218,33 @@ public sealed class GitHubMaintenanceCollector(
                         qualification.ChecksStatus,
                         mergeable,
                         mergeableState);
+
+                    var securityCorrelation = vulnerabilityAssessmentService.CorrelatePullRequest(
+                        repository,
+                        pullRequest,
+                        vulnerabilityFetch.OpenAlerts);
+
+                    if (securityCorrelation.IsSecurityUpdate)
+                    {
+                        evaluation = evaluation with
+                        {
+                            IsSecurityUpdate = true,
+                            SecuritySeverity = securityCorrelation.HighestSeverity,
+                            MatchedVulnerabilities = securityCorrelation.MatchedVulnerabilities,
+                            Reasons = evaluation.Reasons
+                                .Concat([
+                                    $"Cette PR semble corriger une vulnérabilité Dependabot de sévérité {securityCorrelation.HighestSeverity}."
+                                ])
+                                .ToArray(),
+                            Summary = $"{evaluation.Summary} Correction de vulnérabilité détectée ({securityCorrelation.HighestSeverity})."
+                        };
+
+                        if (IsPrioritySeverity(securityCorrelation.HighestSeverity))
+                        {
+                            prioritizedSecurityPullRequests.Add(
+                                $"{display} (priorité sécurité {securityCorrelation.HighestSeverity})");
+                        }
+                    }
 
                     evaluation = await pullRequestAutoMergeService.ExecuteAsync(
                         owner,
@@ -258,7 +309,7 @@ public sealed class GitHubMaintenanceCollector(
 
                 scannedRepositories.Add(repository);
                 logs.Add(
-                    $"[github] {repository} scanné : {readyForReview.Count(status => status.StartsWith($"{repository}#", StringComparison.Ordinal))} prête(s), {blocked.Count(status => status.StartsWith($"{repository}#", StringComparison.Ordinal))} bloquée(s), {failedChecks.Count(status => status.StartsWith($"{repository}#", StringComparison.Ordinal))} en échec, {mergedRenovatePullRequests.Count} fusionnée(s) récemment, {closedRenovatePullRequests.Count} fermée(s) sans fusion.");
+                    $"[github] {repository} scanné : {readyForReview.Count(status => status.StartsWith($"{repository}#", StringComparison.Ordinal))} prête(s), {blocked.Count(status => status.StartsWith($"{repository}#", StringComparison.Ordinal))} bloquée(s), {failedChecks.Count(status => status.StartsWith($"{repository}#", StringComparison.Ordinal))} en échec, {mergedRenovatePullRequests.Count} fusionnée(s) récemment, {closedRenovatePullRequests.Count} fermée(s) sans fusion, {vulnerabilityFetch.RepositorySummary.OpenAlerts} alerte(s) ouvertes.");
             }
             catch (GitHubApiException exception)
             {
@@ -282,6 +333,11 @@ public sealed class GitHubMaintenanceCollector(
             ClosedWithoutMerge = closedWithoutMerge
         };
 
+        var vulnerabilitySummary = vulnerabilityAssessmentService.BuildGlobalSummary(
+            repositoryVulnerabilitySummaries,
+            prioritizedSecurityPullRequests.Distinct(StringComparer.Ordinal).ToArray(),
+            vulnerabilityNotes.Distinct(StringComparer.Ordinal).ToArray());
+
         var autoMerge = CreateAutoMergeSummary(
             readyForMerge,
             manualReviewPullRequests,
@@ -290,7 +346,7 @@ public sealed class GitHubMaintenanceCollector(
             autoMergedPullRequests,
             mergeEvaluations);
 
-        notes.Add("La collecte des vulnérabilités reste non branchée dans cette étape et n'alimente pas encore les compteurs.");
+        notes.AddRange(vulnerabilitySummary.Notes);
         notes.Add("Le worker qualifie désormais les PR Renovate ouvertes selon les checks GitHub et les statuts combinés disponibles.");
         notes.Add("Les PR fermées sans fusion sont corrélées uniquement sur la fenêtre récente configurée.");
         notes.Add(
@@ -313,6 +369,26 @@ public sealed class GitHubMaintenanceCollector(
         if (failedChecks.Count > 0)
         {
             manualActions.Add("Analyser les checks en échec avant toute fusion.");
+        }
+
+        if (vulnerabilitySummary.CriticalCount > 0)
+        {
+            manualActions.Add("Traiter en priorité les vulnérabilités critiques encore ouvertes.");
+        }
+
+        if (vulnerabilitySummary.HighCount > 0)
+        {
+            manualActions.Add("Planifier rapidement le traitement des vulnérabilités élevées.");
+        }
+
+        if (vulnerabilitySummary.PrioritizedPullRequests.Count > 0)
+        {
+            manualActions.Add("Examiner en priorité les PR Renovate corrélées à des vulnérabilités ouvertes.");
+        }
+
+        if (!string.Equals(vulnerabilitySummary.Status, "Available", StringComparison.OrdinalIgnoreCase))
+        {
+            manualActions.Add("Vérifier les permissions GitHub nécessaires à la lecture des Dependabot alerts.");
         }
 
         if (closedWithoutMerge.Count > 0)
@@ -365,10 +441,80 @@ public sealed class GitHubMaintenanceCollector(
             failedPullRequests,
             remainingVulnerabilities,
             pullRequestStatuses,
+            vulnerabilitySummary,
             autoMerge,
             logs,
             notes,
             manualActions);
+    }
+
+    private async Task<VulnerabilityFetchResult> CollectVulnerabilitiesAsync(
+        string repository,
+        string owner,
+        string repositoryName,
+        CancellationToken cancellationToken)
+    {
+        var logs = new List<string>();
+        var notes = new List<string>();
+        var openAlerts = Array.Empty<GitHubDependabotAlertDto>();
+        var fixedAlerts = Array.Empty<GitHubDependabotAlertDto>();
+        var openAlertsAvailable = false;
+        var fixedAlertsAvailable = false;
+
+        try
+        {
+            openAlerts = (await gitHubApiClient.GetDependabotAlertsAsync(
+                owner,
+                repositoryName,
+                "open",
+                cancellationToken)).ToArray();
+            openAlertsAvailable = true;
+        }
+        catch (GitHubApiException exception)
+        {
+            logs.Add($"[github] Dependabot alerts ouvertes indisponibles pour {repository} : {exception.Message}");
+            notes.Add("Les Dependabot alerts ouvertes ne sont pas disponibles pour ce dépôt.");
+        }
+
+        try
+        {
+            fixedAlerts = (await gitHubApiClient.GetDependabotAlertsAsync(
+                owner,
+                repositoryName,
+                "fixed",
+                cancellationToken)).ToArray();
+            fixedAlertsAvailable = true;
+        }
+        catch (GitHubApiException exception)
+        {
+            logs.Add($"[github] Dependabot alerts corrigées indisponibles pour {repository} : {exception.Message}");
+            notes.Add("Les Dependabot alerts corrigées ne sont pas disponibles pour ce dépôt.");
+        }
+
+        var status = openAlertsAvailable && fixedAlertsAvailable
+            ? "Available"
+            : openAlertsAvailable || fixedAlertsAvailable
+                ? "Partial"
+                : "Unavailable";
+
+        if (openAlertsAvailable || fixedAlertsAvailable)
+        {
+            logs.Add(
+                $"[github] {repository} : {openAlerts.Length} alerte(s) Dependabot ouverte(s), {fixedAlerts.Length} corrigée(s).");
+        }
+
+        var repositorySummary = vulnerabilityAssessmentService.BuildRepositorySummary(
+            repository,
+            openAlerts,
+            fixedAlerts,
+            status,
+            notes);
+
+        return new VulnerabilityFetchResult(
+            OpenAlerts: openAlerts,
+            RepositorySummary: repositorySummary,
+            Logs: logs,
+            IsPartial: !string.Equals(status, "Available", StringComparison.OrdinalIgnoreCase));
     }
 
     private async Task<PullRequestQualification> QualifyOpenPullRequestAsync(
@@ -502,6 +648,7 @@ public sealed class GitHubMaintenanceCollector(
         IReadOnlyList<string> failedPullRequests,
         IReadOnlyList<string> remainingVulnerabilities,
         PullRequestStatuses pullRequestStatuses,
+        VulnerabilitySummary vulnerabilities,
         AutoMergeSummary autoMerge,
         IReadOnlyList<string> logs,
         IReadOnlyList<string> notes,
@@ -516,6 +663,7 @@ public sealed class GitHubMaintenanceCollector(
             FailedPullRequests = failedPullRequests,
             RemainingVulnerabilities = remainingVulnerabilities,
             PullRequestStatuses = pullRequestStatuses,
+            Vulnerabilities = vulnerabilities,
             AutoMerge = autoMerge,
             Logs = logs,
             Notes = notes,
@@ -624,7 +772,11 @@ public sealed class GitHubMaintenanceCollector(
             ? $"{evaluation.Repository}#{evaluation.Number}"
             : $"{evaluation.Repository}#{evaluation.Number} - {evaluation.HtmlUrl}";
 
-        return $"{location} ({FormatVersionType(evaluation.VersionType)}, checks {FormatChecksStatus(evaluation.ChecksStatus)}, politique {evaluation.PolicySource}, merge {evaluation.MergeMethod}) - {evaluation.Summary}";
+        var securitySuffix = evaluation.IsSecurityUpdate
+            ? $", sécurité {FormatSecuritySeverity(evaluation.SecuritySeverity)}"
+            : string.Empty;
+
+        return $"{location} ({FormatVersionType(evaluation.VersionType)}, checks {FormatChecksStatus(evaluation.ChecksStatus)}, politique {evaluation.PolicySource}, merge {evaluation.MergeMethod}{securitySuffix}) - {evaluation.Summary}";
     }
 
     private static string FormatVersionType(PullRequestVersionType versionType)
@@ -649,12 +801,29 @@ public sealed class GitHubMaintenanceCollector(
         };
     }
 
+    private static string FormatSecuritySeverity(string severity)
+    {
+        return string.IsNullOrWhiteSpace(severity) ? "non qualifiée" : severity;
+    }
+
+    private static bool IsPrioritySeverity(string severity)
+    {
+        return string.Equals(severity, "critical", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(severity, "high", StringComparison.OrdinalIgnoreCase);
+    }
+
     private sealed record PullRequestQualification(
         PullRequestBucket Bucket,
         string Display,
         PullRequestChecksStatus ChecksStatus,
         bool IsPartial,
         IReadOnlyList<string> Logs);
+
+    private sealed record VulnerabilityFetchResult(
+        IReadOnlyList<GitHubDependabotAlertDto> OpenAlerts,
+        RepositoryVulnerabilitySummary RepositorySummary,
+        IReadOnlyList<string> Logs,
+        bool IsPartial);
 
     private enum PullRequestBucket
     {

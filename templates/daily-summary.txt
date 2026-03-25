@@ -1,0 +1,20 @@
+Synthèse quotidienne repo-ops
+Date d’exécution : {{run_date}}
+
+Dépôts scannés
+{{scanned_repositories}}
+
+PR créées
+{{created_prs}}
+
+PR fusionnées
+{{merged_prs}}
+
+PR en échec
+{{failed_prs}}
+
+Vulnérabilités restantes
+{{remaining_vulnerabilities}}
+
+Actions manuelles recommandées
+{{manual_actions}}

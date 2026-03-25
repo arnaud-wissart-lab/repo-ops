@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Synthèse quotidienne repo-ops</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        font-family: "Segoe UI", Arial, sans-serif;
+        background: #f5f7fb;
+        color: #172033;
+      }
+
+      .container {
+        max-width: 760px;
+        margin: 0 auto;
+        background: #ffffff;
+        border: 1px solid #d9e0ec;
+        border-radius: 12px;
+        overflow: hidden;
+      }
+
+      .header {
+        padding: 24px 28px;
+        background: #123a63;
+        color: #ffffff;
+      }
+
+      .content {
+        padding: 24px 28px;
+      }
+
+      h1,
+      h2 {
+        margin-top: 0;
+      }
+
+      .meta {
+        margin: 0;
+        opacity: 0.9;
+      }
+
+      .section {
+        margin-bottom: 24px;
+      }
+
+      .card {
+        padding: 16px;
+        margin-top: 12px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+      }
+
+      ul {
+        padding-left: 20px;
+      }
+
+      .footer {
+        padding: 18px 28px 24px;
+        font-size: 12px;
+        color: #5b6577;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>Synthèse quotidienne repo-ops</h1>
+        <p class="meta">Date d’exécution : {{run_date}}</p>
+      </div>
+      <div class="content">
+        <div class="section">
+          <h2>Dépôts scannés</h2>
+          <div class="card">{{scanned_repositories}}</div>
+        </div>
+        <div class="section">
+          <h2>PR créées</h2>
+          <div class="card">{{created_prs}}</div>
+        </div>
+        <div class="section">
+          <h2>PR fusionnées</h2>
+          <div class="card">{{merged_prs}}</div>
+        </div>
+        <div class="section">
+          <h2>PR en échec</h2>
+          <div class="card">{{failed_prs}}</div>
+        </div>
+        <div class="section">
+          <h2>Vulnérabilités restantes</h2>
+          <div class="card">{{remaining_vulnerabilities}}</div>
+        </div>
+        <div class="section">
+          <h2>Actions manuelles recommandées</h2>
+          <div class="card">
+            <ul>
+              {{manual_actions}}
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="footer">
+        Message généré par le socle d’automatisation `repo-ops`.
+      </div>
+    </div>
+  </body>
+</html>

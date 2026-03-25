@@ -1,0 +1,89 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - repo-ops
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:1
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+      GENERIC_TIMEZONE: ${TZ}
+      N8N_HOST: ${N8N_HOST}
+      N8N_PORT: ${N8N_PORT}
+      N8N_PROTOCOL: ${N8N_PROTOCOL}
+      N8N_EDITOR_BASE_URL: ${N8N_EDITOR_BASE_URL}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+      N8N_EMAIL_MODE: smtp
+      N8N_SMTP_HOST: ${SMTP_HOST}
+      N8N_SMTP_PORT: ${SMTP_PORT}
+      N8N_SMTP_USER: ${SMTP_USER}
+      N8N_SMTP_PASS: ${SMTP_PASSWORD}
+      N8N_SMTP_SENDER: ${SMTP_FROM}
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: ${POSTGRES_DB}
+      DB_POSTGRESDB_USER: ${POSTGRES_USER}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${N8N_PORT}:${N8N_PORT}"
+    volumes:
+      - n8n-data:/home/node/.n8n
+      - ./n8n/workflows:/files/workflows
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - repo-ops
+
+  renovate:
+    image: renovate/renovate:39
+    restart: unless-stopped
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL}
+      RENOVATE_CONFIG_FILE: /usr/src/app/config.js
+      RENOVATE_BASE_DIR: /var/renovate
+      RENOVATE_TOKEN: ${GITHUB_TOKEN}
+      RENOVATE_GITHUB_COM_TOKEN: ${RENOVATE_GITHUB_COM_TOKEN}
+      RENOVATE_DRY_RUN: ${RENOVATE_DRY_RUN}
+      RENOVATE_REPOSITORIES: ${RENOVATE_REPOSITORIES}
+      TZ: ${TZ}
+    command:
+      - /bin/sh
+      - -lc
+      - |
+        echo "Renovate démarre en mode planifié"
+        while true; do
+          renovate
+          sleep "${RENOVATE_INTERVAL_SECONDS:-86400}"
+        done
+    volumes:
+      - ./renovate/config.js:/usr/src/app/config.js:ro
+      - renovate-data:/var/renovate
+    networks:
+      - repo-ops
+
+networks:
+  repo-ops:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  n8n-data:
+  renovate-data:

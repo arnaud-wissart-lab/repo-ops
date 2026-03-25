@@ -14,6 +14,8 @@ public sealed class GitHubCollectionResult
 
     public IReadOnlyList<string> RemainingVulnerabilities { get; init; } = Array.Empty<string>();
 
+    public PullRequestStatuses PullRequestStatuses { get; init; } = new();
+
     public IReadOnlyList<string> Logs { get; init; } = Array.Empty<string>();
 
     public IReadOnlyList<string> Notes { get; init; } = Array.Empty<string>();

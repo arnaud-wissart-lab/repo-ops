@@ -81,7 +81,7 @@ Le dossier `scripts/` reste présent pour la transition, mais il ne fait plus pa
    - [`worker-summary.json`](./reports/worker-summary.json)
    - [`worker-summary.txt`](./reports/worker-summary.txt)
    - [`worker-summary.html`](./reports/worker-summary.html)
-   Le worker interroge GitHub avec `GITHUB_TOKEN` pour récupérer les PR Renovate ouvertes, les PR Renovate fusionnées récemment et les états de checks les plus simples.
+   Le worker interroge GitHub avec `GITHUB_TOKEN` pour récupérer les PR Renovate ouvertes, les PR Renovate fusionnées récemment, les fermetures sans fusion récentes et les checks utiles à la qualification opérationnelle.
 5. `n8n` supprime d'abord les anciens artefacts, puis lit le JSON frais produit par le worker.
 6. `n8n` envoie l’email en réutilisant directement le sujet, le texte et le HTML déjà préparés.
 
@@ -172,7 +172,8 @@ Cette couche Aspire sert au pilotage local. Pour les exécutions réelles de la 
 - le worker interroge désormais GitHub, mais seulement sur un premier périmètre REST limité ;
 - les PR ouvertes sont comptées à partir des PR Renovate détectées, pas à partir d’un historique d’exécution `Renovate` propre au dépôt ;
 - les PR fusionnées sont lues dans une fenêtre glissante configurable, limitée au dernier lot de PR fermées renvoyé par l’API ;
-- l’état des échecs repose pour l’instant sur le statut combiné des checks GitHub sur la tête de PR ;
+- la qualification des PR ouvertes repose sur la combinaison des check-runs et du statut combiné GitHub sur la tête de PR ;
+- les PR sans check décisif sont classées dans `pullRequestStatuses.blocked` avec une qualification incomplète ;
 - la collecte des vulnérabilités reste encore placeholder ;
 - le déclenchement de maintenance repose encore sur un fichier partagé simple ;
 - le worker fonctionne encore en veille par scrutation légère, pas via une API dédiée ;
@@ -212,6 +213,19 @@ Exemple de statut attendu en sortie :
 {
   "summary": {
     "status": "Success|Partial|Failed"
+  },
+  "pullRequestStatuses": {
+    "readyForReview": [],
+    "blocked": [],
+    "failedChecks": [],
+    "mergedRecently": [],
+    "closedWithoutMerge": []
   }
 }
+```
+
+Exemple de log utile en cas de qualification partielle :
+
+```text
+[github] Check-runs indisponibles pour owner/repo#123 : GitHub a répondu avec le statut HTTP 404
 ```

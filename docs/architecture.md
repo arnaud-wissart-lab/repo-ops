@@ -54,7 +54,8 @@ Dans l’état actuel, le worker :
 - produit un rapport JSON structuré stable ;
 - sépare les modèles métier, le rendu du digest et la persistance ;
 - génère un sujet, un texte brut et un HTML simples ;
-- récupère les PR Renovate ouvertes, les PR Renovate fusionnées récemment et les échecs de checks les plus simples ;
+- récupère les PR Renovate ouvertes, les PR Renovate fusionnées récemment et les fermetures récentes sans fusion ;
+- qualifie les PR ouvertes en `readyForReview`, `blocked` ou `failedChecks` à partir des check-runs et du statut combiné ;
 - peut émettre le JSON sur `stdout` en mode explicite.
 
 ### Aspire AppHost
@@ -126,6 +127,7 @@ docker compose --profile maintenance run --rm renovate --version
 
 - porter la logique métier de collecte GitHub, consolidation et synthèse ;
 - produire le contrat de sortie de référence ;
+- qualifier les PR Renovate pour aider la décision opérationnelle ;
 - fournir les artefacts consommés par `n8n`.
 
 ### Ce qui relève encore de n8n
@@ -138,6 +140,7 @@ docker compose --profile maintenance run --rm renovate --version
 ## Limites actuelles
 
 - la collecte GitHub reste limitée au périmètre REST minimal utile à ce lot ;
+- la qualification des PR ouvertes dépend encore de la disponibilité des check-runs et du statut combiné sur chaque dépôt ;
 - la détection des vulnérabilités n'est pas encore branchée ;
 - le déclenchement repose sur un fichier partagé simple ;
 - le worker reste pour l'instant en veille par scrutation légère ;

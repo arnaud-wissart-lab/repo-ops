@@ -41,6 +41,7 @@ public sealed class MaintenanceReportBuilder(
                     RemainingVulnerabilities = collectionResult.RemainingVulnerabilities.Count
                 }
             },
+            PullRequestStatuses = collectionResult.PullRequestStatuses,
             Messages = new MaintenanceMessages
             {
                 Logs = collectionResult.Logs,

@@ -36,6 +36,17 @@ public sealed class GitHubApiClient(
         return payload?.State ?? string.Empty;
     }
 
+    public async Task<IReadOnlyList<GitHubCheckRunDto>> GetCheckRunsAsync(
+        string owner,
+        string repository,
+        string sha,
+        CancellationToken cancellationToken)
+    {
+        var uri = $"repos/{owner}/{repository}/commits/{Uri.EscapeDataString(sha)}/check-runs?per_page=100";
+        var payload = await GetAsync<GitHubCheckRunsResponseDto>(uri, cancellationToken);
+        return payload?.CheckRuns ?? [];
+    }
+
     private async Task<T?> GetAsync<T>(string relativeUri, CancellationToken cancellationToken)
     {
         ConfigureClient();

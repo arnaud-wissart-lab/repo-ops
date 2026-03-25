@@ -36,6 +36,7 @@ Déplacer progressivement la logique utile vers la couche `.NET`, tout en conser
 ### Livrables
 
 - collecte GitHub structurée dans le worker ;
+- qualification opérationnelle des PR Renovate dans le worker ;
 - consolidation de résultats multi-repo ;
 - génération de synthèse plus complète ;
 - workflows `n8n` mieux alignés avec les sorties du worker ;

@@ -18,6 +18,29 @@ public sealed class GitHubMaintenanceCollector(
         "renovate-bot"
     };
 
+    private static readonly HashSet<string> SuccessfulCheckConclusions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "success",
+        "neutral",
+        "skipped"
+    };
+
+    private static readonly HashSet<string> FailedCheckConclusions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "action_required",
+        "cancelled",
+        "failure",
+        "startup_failure",
+        "stale",
+        "timed_out"
+    };
+
+    private const string ReadyForReviewReason = "checks verts";
+    private const string PendingChecksReason = "checks en attente";
+    private const string FailedChecksReason = "checks en échec";
+    private const string DraftReason = "brouillon";
+    private const string UnknownChecksReason = "qualification incomplète";
+
     public async Task<GitHubCollectionResult> CollectAsync(
         IReadOnlyList<string> configuredRepositories,
         CancellationToken cancellationToken)
@@ -30,6 +53,11 @@ public sealed class GitHubMaintenanceCollector(
         var mergedPullRequests = new List<string>();
         var failedPullRequests = new List<string>();
         var remainingVulnerabilities = new List<string>();
+        var readyForReview = new List<string>();
+        var blocked = new List<string>();
+        var failedChecks = new List<string>();
+        var mergedRecently = new List<string>();
+        var closedWithoutMerge = new List<string>();
         var repositoryFailures = 0;
         var partialDataDetected = false;
 
@@ -46,6 +74,7 @@ public sealed class GitHubMaintenanceCollector(
                 mergedPullRequests,
                 failedPullRequests,
                 remainingVulnerabilities,
+                new PullRequestStatuses(),
                 logs,
                 notes,
                 manualActions);
@@ -64,13 +93,14 @@ public sealed class GitHubMaintenanceCollector(
                 mergedPullRequests,
                 failedPullRequests,
                 remainingVulnerabilities,
+                new PullRequestStatuses(),
                 logs,
                 notes,
                 manualActions);
         }
 
-        var mergedThreshold = DateTimeOffset.UtcNow.AddDays(-Math.Abs(options.Value.RecentMergedWindowDays));
-        logs.Add($"[github] Fenêtre de fusion récente configurée sur {options.Value.RecentMergedWindowDays} jour(s).");
+        var recentThreshold = DateTimeOffset.UtcNow.AddDays(-Math.Abs(options.Value.RecentMergedWindowDays));
+        logs.Add($"[github] Fenêtre de corrélation récente configurée sur {options.Value.RecentMergedWindowDays} jour(s).");
 
         foreach (var repository in configuredRepositories)
         {
@@ -103,54 +133,58 @@ public sealed class GitHubMaintenanceCollector(
 
                 var mergedRenovatePullRequests = closedPullRequests
                     .Where(IsRenovatePullRequest)
-                    .Where(pullRequest => pullRequest.MergedAt is not null && pullRequest.MergedAt >= mergedThreshold)
+                    .Where(pullRequest => pullRequest.MergedAt is not null && pullRequest.MergedAt >= recentThreshold)
+                    .ToList();
+
+                var closedRenovatePullRequests = closedPullRequests
+                    .Where(IsRenovatePullRequest)
+                    .Where(pullRequest => pullRequest.MergedAt is null && pullRequest.ClosedAt is not null && pullRequest.ClosedAt >= recentThreshold)
                     .ToList();
 
                 foreach (var pullRequest in openRenovatePullRequests)
                 {
                     createdPullRequests.Add(FormatPullRequest(repository, pullRequest));
 
-                    if (string.IsNullOrWhiteSpace(pullRequest.Head.Sha))
-                    {
-                        partialDataDetected = true;
-                        logs.Add($"[github] SHA absent pour la PR {repository}#{pullRequest.Number}, état des checks indisponible.");
-                        continue;
-                    }
+                    var qualification = await QualifyOpenPullRequestAsync(
+                        repository,
+                        owner,
+                        repositoryName,
+                        pullRequest,
+                        cancellationToken);
 
-                    try
-                    {
-                        var state = await gitHubApiClient.GetCombinedStatusStateAsync(
-                            owner,
-                            repositoryName,
-                            pullRequest.Head.Sha,
-                            cancellationToken);
+                    partialDataDetected |= qualification.IsPartial;
+                    logs.AddRange(qualification.Logs);
 
-                        if (string.Equals(state, "failure", StringComparison.OrdinalIgnoreCase)
-                            || string.Equals(state, "error", StringComparison.OrdinalIgnoreCase))
-                        {
-                            failedPullRequests.Add($"{FormatPullRequest(repository, pullRequest)} (checks: {state})");
-                        }
-                    }
-                    catch (GitHubApiException exception) when (exception.StatusCode == HttpStatusCode.NotFound)
+                    switch (qualification.Bucket)
                     {
-                        partialDataDetected = true;
-                        logs.Add($"[github] Checks indisponibles pour {repository}#{pullRequest.Number} : {exception.Message}");
-                    }
-                    catch (GitHubApiException exception)
-                    {
-                        partialDataDetected = true;
-                        logs.Add($"[github] Impossible de lire l'état des checks pour {repository}#{pullRequest.Number} : {exception.Message}");
+                        case PullRequestBucket.ReadyForReview:
+                            readyForReview.Add(qualification.Display);
+                            break;
+                        case PullRequestBucket.FailedChecks:
+                            failedChecks.Add(qualification.Display);
+                            failedPullRequests.Add(qualification.Display);
+                            break;
+                        default:
+                            blocked.Add(qualification.Display);
+                            break;
                     }
                 }
 
                 foreach (var pullRequest in mergedRenovatePullRequests)
                 {
-                    mergedPullRequests.Add(FormatPullRequest(repository, pullRequest));
+                    var entry = $"{FormatPullRequest(repository, pullRequest)} (fusionnée récemment)";
+                    mergedPullRequests.Add(entry);
+                    mergedRecently.Add(entry);
+                }
+
+                foreach (var pullRequest in closedRenovatePullRequests)
+                {
+                    closedWithoutMerge.Add($"{FormatPullRequest(repository, pullRequest)} (fermée sans fusion)");
                 }
 
                 scannedRepositories.Add(repository);
                 logs.Add(
-                    $"[github] {repository} scanné : {openRenovatePullRequests.Count} PR Renovate ouverte(s), {mergedRenovatePullRequests.Count} PR Renovate fusionnée(s) récemment.");
+                    $"[github] {repository} scanné : {readyForReview.Count(status => status.StartsWith($"{repository}#", StringComparison.Ordinal))} prête(s), {blocked.Count(status => status.StartsWith($"{repository}#", StringComparison.Ordinal))} bloquée(s), {failedChecks.Count(status => status.StartsWith($"{repository}#", StringComparison.Ordinal))} en échec, {mergedRenovatePullRequests.Count} fusionnée(s) récemment, {closedRenovatePullRequests.Count} fermée(s) sans fusion.");
             }
             catch (GitHubApiException exception)
             {
@@ -165,8 +199,38 @@ public sealed class GitHubMaintenanceCollector(
             }
         }
 
+        var pullRequestStatuses = new PullRequestStatuses
+        {
+            ReadyForReview = readyForReview,
+            Blocked = blocked,
+            FailedChecks = failedChecks,
+            MergedRecently = mergedRecently,
+            ClosedWithoutMerge = closedWithoutMerge
+        };
+
         notes.Add("La collecte des vulnérabilités reste non branchée dans cette étape et n'alimente pas encore les compteurs.");
-        notes.Add("Le worker lit désormais GitHub pour les PR Renovate et les états de checks les plus simples.");
+        notes.Add("Le worker qualifie désormais les PR Renovate ouvertes selon les checks GitHub et les statuts combinés disponibles.");
+        notes.Add("Les PR fermées sans fusion sont corrélées uniquement sur la fenêtre récente configurée.");
+
+        if (readyForReview.Count > 0)
+        {
+            manualActions.Add("Examiner et traiter les PR Renovate prêtes avec checks verts.");
+        }
+
+        if (blocked.Count > 0)
+        {
+            manualActions.Add("Surveiller les PR bloquées ou en attente avant décision.");
+        }
+
+        if (failedChecks.Count > 0)
+        {
+            manualActions.Add("Analyser les checks en échec avant toute fusion.");
+        }
+
+        if (closedWithoutMerge.Count > 0)
+        {
+            manualActions.Add("Vérifier si les PR fermées sans fusion l'ont été volontairement.");
+        }
 
         manualActions.Add("Compléter plus tard la collecte des vulnérabilités avec une source GitHub dédiée.");
 
@@ -183,7 +247,7 @@ public sealed class GitHubMaintenanceCollector(
         }
         else if (status == "Partial")
         {
-            notes.Add("La collecte GitHub a produit un résultat partiel : au moins un dépôt ou une donnée complémentaire n'a pas pu être traité.");
+            notes.Add("La collecte GitHub a produit un résultat partiel : au moins un dépôt ou une qualification de checks n'a pas pu être obtenue complètement.");
         }
         else
         {
@@ -197,9 +261,127 @@ public sealed class GitHubMaintenanceCollector(
             mergedPullRequests,
             failedPullRequests,
             remainingVulnerabilities,
+            pullRequestStatuses,
             logs,
             notes,
             manualActions);
+    }
+
+    private async Task<PullRequestQualification> QualifyOpenPullRequestAsync(
+        string repository,
+        string owner,
+        string repositoryName,
+        GitHubPullRequestDto pullRequest,
+        CancellationToken cancellationToken)
+    {
+        var logs = new List<string>();
+        var combinedState = string.Empty;
+        var checkRuns = Array.Empty<GitHubCheckRunDto>();
+        var partialDataDetected = false;
+
+        if (pullRequest.Draft)
+        {
+            return new PullRequestQualification(
+                PullRequestBucket.Blocked,
+                $"{FormatPullRequest(repository, pullRequest)} ({DraftReason})",
+                false,
+                logs);
+        }
+
+        if (string.IsNullOrWhiteSpace(pullRequest.Head.Sha))
+        {
+            partialDataDetected = true;
+            logs.Add($"[github] SHA absent pour la PR {repository}#{pullRequest.Number}, qualification des checks impossible.");
+            return new PullRequestQualification(
+                PullRequestBucket.Blocked,
+                $"{FormatPullRequest(repository, pullRequest)} ({UnknownChecksReason})",
+                partialDataDetected,
+                logs);
+        }
+
+        try
+        {
+            checkRuns = (await gitHubApiClient.GetCheckRunsAsync(
+                owner,
+                repositoryName,
+                pullRequest.Head.Sha,
+                cancellationToken)).ToArray();
+        }
+        catch (GitHubApiException exception) when (exception.StatusCode == HttpStatusCode.NotFound)
+        {
+            partialDataDetected = true;
+            logs.Add($"[github] Check-runs indisponibles pour {repository}#{pullRequest.Number} : {exception.Message}");
+        }
+        catch (GitHubApiException exception)
+        {
+            partialDataDetected = true;
+            logs.Add($"[github] Impossible de lire les check-runs pour {repository}#{pullRequest.Number} : {exception.Message}");
+        }
+
+        try
+        {
+            combinedState = await gitHubApiClient.GetCombinedStatusStateAsync(
+                owner,
+                repositoryName,
+                pullRequest.Head.Sha,
+                cancellationToken);
+        }
+        catch (GitHubApiException exception) when (exception.StatusCode == HttpStatusCode.NotFound)
+        {
+            partialDataDetected = true;
+            logs.Add($"[github] Statut combiné indisponible pour {repository}#{pullRequest.Number} : {exception.Message}");
+        }
+        catch (GitHubApiException exception)
+        {
+            partialDataDetected = true;
+            logs.Add($"[github] Impossible de lire le statut combiné pour {repository}#{pullRequest.Number} : {exception.Message}");
+        }
+
+        var hasFailedChecks = checkRuns.Any(CheckRunHasFailed)
+            || string.Equals(combinedState, "failure", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(combinedState, "error", StringComparison.OrdinalIgnoreCase);
+
+        if (hasFailedChecks)
+        {
+            return new PullRequestQualification(
+                PullRequestBucket.FailedChecks,
+                $"{FormatPullRequest(repository, pullRequest)} ({FailedChecksReason})",
+                partialDataDetected,
+                logs);
+        }
+
+        var hasPendingChecks = checkRuns.Any(CheckRunIsPending)
+            || string.Equals(combinedState, "pending", StringComparison.OrdinalIgnoreCase);
+
+        if (hasPendingChecks)
+        {
+            return new PullRequestQualification(
+                PullRequestBucket.Blocked,
+                $"{FormatPullRequest(repository, pullRequest)} ({PendingChecksReason})",
+                partialDataDetected,
+                logs);
+        }
+
+        var hasSuccessfulChecks = checkRuns.Any(CheckRunHasSucceeded)
+            || string.Equals(combinedState, "success", StringComparison.OrdinalIgnoreCase);
+
+        if (hasSuccessfulChecks)
+        {
+            return new PullRequestQualification(
+                PullRequestBucket.ReadyForReview,
+                $"{FormatPullRequest(repository, pullRequest)} ({ReadyForReviewReason})",
+                partialDataDetected,
+                logs);
+        }
+
+        partialDataDetected = true;
+        logs.Add($"[github] Qualification incomplète pour {repository}#{pullRequest.Number} : aucun statut décisif n'a été trouvé.");
+
+        return new PullRequestQualification(
+            PullRequestBucket.Blocked,
+            $"{FormatPullRequest(repository, pullRequest)} ({UnknownChecksReason})",
+            partialDataDetected,
+            logs);
     }
 
     private static GitHubCollectionResult BuildResult(
@@ -209,6 +391,7 @@ public sealed class GitHubMaintenanceCollector(
         IReadOnlyList<string> mergedPullRequests,
         IReadOnlyList<string> failedPullRequests,
         IReadOnlyList<string> remainingVulnerabilities,
+        PullRequestStatuses pullRequestStatuses,
         IReadOnlyList<string> logs,
         IReadOnlyList<string> notes,
         IReadOnlyList<string> manualActions)
@@ -221,9 +404,10 @@ public sealed class GitHubMaintenanceCollector(
             MergedPullRequests = mergedPullRequests,
             FailedPullRequests = failedPullRequests,
             RemainingVulnerabilities = remainingVulnerabilities,
+            PullRequestStatuses = pullRequestStatuses,
             Logs = logs,
             Notes = notes,
-            ManualActions = manualActions
+            ManualActions = manualActions.Distinct(StringComparer.Ordinal).ToArray()
         };
     }
 
@@ -264,6 +448,24 @@ public sealed class GitHubMaintenanceCollector(
             || pullRequest.Head.Ref.StartsWith("renovate/", StringComparison.OrdinalIgnoreCase);
     }
 
+    private static bool CheckRunHasFailed(GitHubCheckRunDto checkRun)
+    {
+        return FailedCheckConclusions.Contains(checkRun.Conclusion);
+    }
+
+    private static bool CheckRunIsPending(GitHubCheckRunDto checkRun)
+    {
+        return string.Equals(checkRun.Status, "queued", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(checkRun.Status, "in_progress", StringComparison.OrdinalIgnoreCase)
+            || string.IsNullOrWhiteSpace(checkRun.Conclusion);
+    }
+
+    private static bool CheckRunHasSucceeded(GitHubCheckRunDto checkRun)
+    {
+        return string.Equals(checkRun.Status, "completed", StringComparison.OrdinalIgnoreCase)
+            && SuccessfulCheckConclusions.Contains(checkRun.Conclusion);
+    }
+
     private static string FormatPullRequest(string repository, GitHubPullRequestDto pullRequest)
     {
         var title = string.IsNullOrWhiteSpace(pullRequest.Title)
@@ -273,5 +475,18 @@ public sealed class GitHubMaintenanceCollector(
         return string.IsNullOrWhiteSpace(pullRequest.HtmlUrl)
             ? $"{repository}#{pullRequest.Number} - {title}"
             : $"{repository}#{pullRequest.Number} - {title} - {pullRequest.HtmlUrl}";
+    }
+
+    private sealed record PullRequestQualification(
+        PullRequestBucket Bucket,
+        string Display,
+        bool IsPartial,
+        IReadOnlyList<string> Logs);
+
+    private enum PullRequestBucket
+    {
+        ReadyForReview,
+        Blocked,
+        FailedChecks
     }
 }

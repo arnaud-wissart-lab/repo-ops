@@ -33,21 +33,33 @@ public sealed class MaintenanceDigestRenderer
         builder.AppendLine();
         AppendSection(
             builder,
-            "PR ouvertes Renovate détectées",
-            report.Summary.CreatedPullRequests,
-            "Aucune PR ouverte Renovate détectée.");
+            "PR prêtes à traiter",
+            report.PullRequestStatuses.ReadyForReview,
+            "Aucune PR prête à traiter.");
         builder.AppendLine();
         AppendSection(
             builder,
-            "PR fusionnées récemment",
-            report.Summary.MergedPullRequests,
-            "Aucune PR fusionnée récemment.");
+            "PR bloquées ou en attente",
+            report.PullRequestStatuses.Blocked,
+            "Aucune PR bloquée ou en attente.");
         builder.AppendLine();
         AppendSection(
             builder,
             "PR en échec détectées",
-            report.Summary.FailedPullRequests,
+            report.PullRequestStatuses.FailedChecks,
             "Aucune PR en échec détectée.");
+        builder.AppendLine();
+        AppendSection(
+            builder,
+            "PR fusionnées récemment",
+            report.PullRequestStatuses.MergedRecently,
+            "Aucune PR fusionnée récemment.");
+        builder.AppendLine();
+        AppendSection(
+            builder,
+            "PR fermées sans fusion",
+            report.PullRequestStatuses.ClosedWithoutMerge,
+            "Aucune PR fermée sans fusion détectée récemment.");
         builder.AppendLine();
         builder.AppendLine("Actions manuelles recommandées :");
 
@@ -96,12 +108,16 @@ public sealed class MaintenanceDigestRenderer
                       <li>PR en échec : {report.Summary.Counts.FailedPullRequests}</li>
                       <li>Vulnérabilités restantes : {report.Summary.Counts.RemainingVulnerabilities}</li>
                     </ul>
-                    <h2>PR ouvertes Renovate détectées</h2>
-                    {RenderList(report.Summary.CreatedPullRequests, "Aucune PR ouverte Renovate détectée.")}
-                    <h2>PR fusionnées récemment</h2>
-                    {RenderList(report.Summary.MergedPullRequests, "Aucune PR fusionnée récemment.")}
+                    <h2>PR prêtes à traiter</h2>
+                    {RenderList(report.PullRequestStatuses.ReadyForReview, "Aucune PR prête à traiter.")}
+                    <h2>PR bloquées ou en attente</h2>
+                    {RenderList(report.PullRequestStatuses.Blocked, "Aucune PR bloquée ou en attente.")}
                     <h2>PR en échec détectées</h2>
-                    {RenderList(report.Summary.FailedPullRequests, "Aucune PR en échec détectée.")}
+                    {RenderList(report.PullRequestStatuses.FailedChecks, "Aucune PR en échec détectée.")}
+                    <h2>PR fusionnées récemment</h2>
+                    {RenderList(report.PullRequestStatuses.MergedRecently, "Aucune PR fusionnée récemment.")}
+                    <h2>PR fermées sans fusion</h2>
+                    {RenderList(report.PullRequestStatuses.ClosedWithoutMerge, "Aucune PR fermée sans fusion détectée récemment.")}
                     <h2>Actions manuelles recommandées</h2>
                     {RenderList(report.Recommendations.ManualActions, "Aucune action manuelle supplémentaire.")}
                     <h2>Notes</h2>

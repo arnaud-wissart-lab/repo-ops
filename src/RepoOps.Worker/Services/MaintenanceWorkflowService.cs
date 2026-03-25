@@ -23,6 +23,7 @@ public sealed class MaintenanceWorkflowService(
         report = new MaintenanceRunReport
         {
             Summary = report.Summary,
+            PullRequestStatuses = report.PullRequestStatuses,
             Messages = report.Messages,
             Recommendations = report.Recommendations,
             Digest = digestRenderer.Render(report)

@@ -1,0 +1,55 @@
+var builder = DistributedApplication.CreateBuilder(args);
+
+var configuration = builder.Configuration;
+var timeZone = configuration["TZ"] ?? "Europe/Paris";
+var postgresDatabase = configuration["POSTGRES_DB"] ?? "n8n";
+var postgresUser = configuration["POSTGRES_USER"] ?? "n8n";
+var n8nPort = int.TryParse(configuration["N8N_PORT"], out var parsedN8nPort) ? parsedN8nPort : 5678;
+var n8nProtocol = configuration["N8N_PROTOCOL"] ?? "http";
+var n8nHost = configuration["N8N_HOST"] ?? "localhost";
+
+var postgresPassword = builder.AddParameter(
+    "postgres-password",
+    configuration["POSTGRES_PASSWORD"] ?? "changez-moi",
+    secret: true);
+var n8nEncryptionKey = builder.AddParameter(
+    "n8n-encryption-key",
+    configuration["N8N_ENCRYPTION_KEY"] ?? "changez-moi",
+    secret: true);
+
+var postgres = builder.AddContainer("postgres", "postgres", "16-alpine")
+    .WithEnvironment("TZ", timeZone)
+    .WithEnvironment("POSTGRES_DB", postgresDatabase)
+    .WithEnvironment("POSTGRES_USER", postgresUser)
+    .WithEnvironment("POSTGRES_PASSWORD", postgresPassword)
+    .WithEnvironment("POSTGRES_INITDB_ARGS", "--auth-host=scram-sha-256 --auth-local=scram-sha-256");
+
+var worker = builder.AddProject<Projects.RepoOps_Worker>("worker")
+    .WithEnvironment("TZ", timeZone)
+    .WithEnvironment("LOG_LEVEL", configuration["LOG_LEVEL"] ?? "info")
+    .WithEnvironment("RENOVATE_REPOSITORIES", configuration["RENOVATE_REPOSITORIES"] ?? string.Empty)
+    .WithEnvironment("RepoOps__Worker__InputSource", "aspire-apphost")
+    .WithEnvironment("RepoOps__Worker__ContinuousModeEnabled", "false");
+
+var n8n = builder.AddContainer("n8n", "docker.n8n.io/n8nio/n8n", "1")
+    .WithEnvironment("TZ", timeZone)
+    .WithEnvironment("GENERIC_TIMEZONE", timeZone)
+    .WithEnvironment("LOG_LEVEL", configuration["LOG_LEVEL"] ?? "info")
+    .WithEnvironment("N8N_HOST", n8nHost)
+    .WithEnvironment("N8N_PORT", n8nPort.ToString())
+    .WithEnvironment("N8N_PROTOCOL", n8nProtocol)
+    .WithEnvironment("N8N_EDITOR_BASE_URL", n8nProtocol + "://" + n8nHost + ":" + n8nPort)
+    .WithEnvironment("N8N_ENCRYPTION_KEY", n8nEncryptionKey)
+    .WithEnvironment("DB_TYPE", "postgresdb")
+    .WithEnvironment("DB_POSTGRESDB_HOST", "postgres")
+    .WithEnvironment("DB_POSTGRESDB_PORT", "5432")
+    .WithEnvironment("DB_POSTGRESDB_DATABASE", postgresDatabase)
+    .WithEnvironment("DB_POSTGRESDB_USER", postgresUser)
+    .WithEnvironment("DB_POSTGRESDB_PASSWORD", postgresPassword)
+    .WithEnvironment("RENOVATE_REPOSITORIES", configuration["RENOVATE_REPOSITORIES"] ?? string.Empty)
+    .WithHttpEndpoint(port: n8nPort, targetPort: n8nPort, name: "http");
+
+worker.WaitFor(postgres);
+n8n.WaitFor(postgres);
+
+builder.Build().Run();

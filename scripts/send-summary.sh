@@ -23,6 +23,7 @@ for arg in "$@"; do
 done
 
 echo "[send-summary] Placeholder actif"
+echo "[send-summary] Ce script reste une passerelle transitoire jusqu'à la consolidation de la synthèse dans le worker .NET"
 echo "[send-summary] Rapport attendu : ${REPORT_FILE}"
 echo "[send-summary] Templates attendus : ${HTML_TEMPLATE} et ${TEXT_TEMPLATE}"
 echo "[send-summary] Destinataires SMTP attendus via SMTP_TO"

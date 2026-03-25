@@ -71,6 +71,7 @@ RUN_DATE_ISO="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 SCANNED_REPOSITORIES_JSON="$(to_json_array "$REPOSITORIES_CSV")"
 
 log "Placeholder actif"
+log "Ce script reste une passerelle transitoire le temps que la logique métier migre vers le worker .NET"
 log "Source attendue plus tard : journaux Renovate, états de PR GitHub et résultats de CI"
 log "Source d'entrée actuelle : ${INPUT_SOURCE}"
 
@@ -99,11 +100,13 @@ if [ "$OUTPUT_FORMAT" = "json" ]; then
   ],
   "logMessages": [
     "[collect-results] Exécution placeholder sans effet de bord.",
-    "[collect-results] Les dépôts ciblés proviennent de RENOVATE_REPOSITORIES si la variable est définie."
+    "[collect-results] Les dépôts ciblés proviennent de RENOVATE_REPOSITORIES si la variable est définie.",
+    "[collect-results] Ce script est une compatibilité transitoire pour n8n avant bascule vers le worker .NET."
   ],
   "notes": [
     "Le script retourne un contrat JSON stable pour permettre l'import et le test du workflow n8n.",
-    "Aucune donnée GitHub réelle n'est encore interrogée à ce stade."
+    "Aucune donnée GitHub réelle n'est encore interrogée à ce stade.",
+    "La cible à moyen terme est de déléguer cette responsabilité au worker .NET."
   ],
   "counts": {
     "scannedRepositories": $(printf '%s' "$SCANNED_REPOSITORIES_JSON" | tr -cd '"' | wc -c | awk '{ print $1 / 2 }'),

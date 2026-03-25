@@ -8,6 +8,7 @@ $htmlTemplate = if ($env:HTML_TEMPLATE) { $env:HTML_TEMPLATE } else { "templates
 $textTemplate = if ($env:TEXT_TEMPLATE) { $env:TEXT_TEMPLATE } else { "templates/daily-summary.txt" }
 
 Write-Host "[send-summary] Placeholder actif"
+Write-Host "[send-summary] Ce script reste une passerelle transitoire jusqu'à la consolidation de la synthèse dans le worker .NET"
 Write-Host "[send-summary] Rapport attendu : $reportFile"
 Write-Host "[send-summary] Templates attendus : $htmlTemplate et $textTemplate"
 Write-Host "[send-summary] Destinataires SMTP attendus via SMTP_TO"

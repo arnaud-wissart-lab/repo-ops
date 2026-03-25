@@ -27,10 +27,12 @@ if ($repositoriesCsv) {
 
 $logMessages = @(
     "[collect-results] Exécution placeholder sans effet de bord.",
-    "[collect-results] Les dépôts ciblés proviennent de RENOVATE_REPOSITORIES si la variable est définie."
+    "[collect-results] Les dépôts ciblés proviennent de RENOVATE_REPOSITORIES si la variable est définie.",
+    "[collect-results] Ce script est une compatibilité transitoire pour n8n avant bascule vers le worker .NET."
 )
 
 [Console]::Error.WriteLine("[collect-results] Placeholder actif")
+[Console]::Error.WriteLine("[collect-results] Ce script reste une passerelle transitoire le temps que la logique métier migre vers le worker .NET")
 [Console]::Error.WriteLine("[collect-results] Source attendue plus tard : journaux Renovate, états de PR GitHub et résultats de CI")
 [Console]::Error.WriteLine("[collect-results] Source d'entrée actuelle : $InputSource")
 
@@ -59,7 +61,8 @@ $payload = [ordered]@{
     logMessages = $logMessages
     notes = @(
         "Le script retourne un contrat JSON stable pour permettre l'import et le test du workflow n8n.",
-        "Aucune donnée GitHub réelle n'est encore interrogée à ce stade."
+        "Aucune donnée GitHub réelle n'est encore interrogée à ce stade.",
+        "La cible à moyen terme est de déléguer cette responsabilité au worker .NET."
     )
     counts = [ordered]@{
         scannedRepositories = $scannedRepositories.Count

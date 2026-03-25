@@ -1,60 +1,63 @@
 # Plan de déploiement
 
-## Phase 1 - Maintenance multi-repo
+## Phase 1 - Socle .NET et exécution locale
 
 ### Objectif
 
-Mettre en place une boucle de maintenance fiable sur une allowlist courte de dépôts publics personnels.
+Poser un socle principal `.NET + Docker Compose` directement exploitable localement, sans perdre les briques déjà utiles.
 
 ### Livrables
 
-- stack `docker compose` opérationnelle ;
-- configuration `Renovate` self-hosted d’administration ;
-- premières exécutions sur une liste restreinte de dépôts ;
-- documentation de démarrage et d’exploitation minimale.
+- solution [`RepoOps.sln`](../RepoOps.sln) ;
+- worker `.NET` exécutable ;
+- AppHost Aspire de pilotage local ;
+- stack `docker compose` intégrant `worker`, `postgres`, `n8n` et `renovate` ;
+- documentation claire sur le partage des responsabilités entre Compose, Aspire, worker et `n8n`.
 
 ### Risques
 
-- jeton GitHub sous-dimensionné ;
-- allowlist trop large dès le départ ;
-- bruit excessif de pull requests si les limites de concurrence sont mal calibrées.
+- confusion entre le runtime réel et la couche de pilotage locale ;
+- duplication de responsabilités entre scripts et services `.NET` ;
+- dérive vers une stack trop complexe trop tôt.
 
 ### Critères de validation
 
-- la stack démarre localement ;
-- `Renovate` cible uniquement les dépôts explicitement listés ;
-- au moins un dépôt de test génère un comportement attendu en mode prudent.
+- la solution s’ouvre correctement dans Visual Studio ;
+- le worker `.NET` compile et s’exécute ;
+- `docker compose` démarre la stack locale ;
+- `Aspire` permet de visualiser localement le worker, `postgres` et `n8n`.
 
-## Phase 2 - Reporting et gouvernance
+## Phase 2 - Reporting et orchestration métier
 
 ### Objectif
 
-Structurer le reporting quotidien et rendre le suivi plus lisible pour la prise de décision.
+Déplacer progressivement la logique utile vers la couche `.NET`, tout en conservant `n8n` pour les déclenchements simples et les notifications.
 
 ### Livrables
 
-- workflows `n8n` de planification et de collecte ;
-- scripts de consolidation des résultats ;
-- synthèse email HTML et texte brut ;
-- premiers indicateurs de volumétrie, d’échec et de dette restante.
+- collecte structurée dans le worker ;
+- consolidation de résultats multi-repo ;
+- génération de synthèse plus complète ;
+- workflows `n8n` mieux alignés avec les sorties du worker ;
+- réduction progressive du rôle des scripts de transition.
 
 ### Risques
 
+- contrat de données instable entre `n8n` et le worker ;
 - données hétérogènes selon les dépôts ;
-- faux positifs ou informations incomplètes dans la synthèse ;
-- dépendance trop forte à une seule source d’information.
+- faux sentiment de complétude alors que certaines sources restent placeholders.
 
 ### Critères de validation
 
-- un résumé quotidien est généré sans intervention manuelle ;
-- les sections clés du reporting sont alimentées de manière cohérente ;
-- les actions manuelles recommandées sont identifiables rapidement.
+- un cycle quotidien complet peut être observé localement ;
+- la synthèse s’appuie majoritairement sur la couche `.NET` ;
+- les scripts restants ont un rôle limité, explicite et documenté.
 
 ## Phase 3 - Superviseur IA
 
 ### Objectif
 
-Ajouter une couche de supervision IA capable de piloter des tâches de delivery multi-repo sans remettre en cause le socle d’exécution existant.
+Ajouter une couche de supervision capable de piloter des tâches de delivery multi-repo sans remettre en cause le socle d’exécution existant.
 
 ### Livrables
 
@@ -62,18 +65,16 @@ Ajouter une couche de supervision IA capable de piloter des tâches de delivery 
 - séparation explicite des rôles `planner`, `implementer`, `reviewer`, `QA` et `reporter` ;
 - gabarits de tâches standardisés ;
 - critères d’arrêt, de validation et de synthèse ;
-- première structure cible d’organisation interne pour les futures tâches et rapports.
+- premières conventions d’intégration avec les dépôts réels pilotés.
 
 ### Risques
 
 - surcouche trop complexe trop tôt ;
-- décisions peu explicables ;
-- dépendance fonctionnelle excessive à des signaux imparfaits ;
+- automatisation insuffisamment bornée ;
 - confusion entre dépôt d’orchestration et dépôts applicatifs pilotés.
 
 ### Critères de validation
 
-- l’architecture cible du superviseur est documentée et actionnable ;
+- l’extension future reste compatible avec les `AGENTS.md` des dépôts cibles ;
 - la séparation des rôles et des critères d’arrêt est explicite ;
-- le superviseur reste borné par les instructions locales des dépôts cibles ;
-- aucune automatisation non maîtrisée n’est introduite avant la phase d’implémentation réelle.
+- aucune automatisation non maîtrisée n’est introduite avant l’implémentation réelle.

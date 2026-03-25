@@ -15,6 +15,7 @@
 *.userosscache
 *.rsuser
 *.sln.docstates
+*.userprefs
 
 # Logs et traces
 *.log
@@ -52,3 +53,7 @@ desktop.ini
 
 # Dépendances locales
 node_modules/
+
+# Artefacts .NET
+**/bin/
+**/obj/

@@ -14,6 +14,8 @@ Le premier workflow livré couvre la chaîne minimale suivante :
 - génération d’une synthèse textuelle et HTML ;
 - envoi d’un email récapitulatif.
 
+Dans l’architecture actuelle, ce workflow reste volontairement simple et s’appuie encore sur les scripts transitoires du dépôt. La cible à moyen terme est de déléguer la collecte et la consolidation au worker `.NET`, tout en conservant `n8n` pour les cron et les notifications.
+
 ## Workflow quotidien
 
 Le fichier [`workflows/repo-ops-daily-maintenance.json`](./workflows/repo-ops-daily-maintenance.json) contient un workflow de base prévu pour être importé dans `n8n`.

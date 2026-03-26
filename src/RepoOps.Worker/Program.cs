@@ -190,6 +190,7 @@ builder.Services.AddOptions<DeploymentOptions>()
         }
 
         options.TargetName = configuration["DEPLOYMENT_TARGET_NAME"] ?? options.TargetName;
+        options.VerificationUrl = configuration["DEPLOYMENT_VERIFICATION_URL"] ?? options.VerificationUrl;
         options.Command = configuration["DEPLOYMENT_COMMAND"] ?? options.Command;
         options.Arguments = configuration["DEPLOYMENT_ARGUMENTS"] ?? options.Arguments;
         options.DryRunArguments = configuration["DEPLOYMENT_DRY_RUN_ARGUMENTS"] ?? options.DryRunArguments;

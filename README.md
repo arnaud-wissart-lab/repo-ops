@@ -111,6 +111,7 @@ Elle reste volontairement en mode démonstration :
 
 Elle peut aussi charger un scénario mock réaliste lorsque l’API locale n’est pas disponible.
 Le bouton de déploiement local appelle le worker, qui exécute une commande configurable sur la machine où il tourne.
+Pour `repo-ops`, la cible retenue est ce dépôt lui-même sur la machine personnelle, avec une vérification publique sur `https://repoops.arnaudwissart.fr`.
 
 ### Scripts transitoires
 
@@ -661,6 +662,7 @@ npm run dev
 
 Le bouton `Déployer en local` appelle `POST /deployment/run`.
 Il est surtout prévu quand le worker est lancé sur l’hôte via `dotnet run`, afin d’exécuter un déploiement local explicite du socle sur la même machine.
+Le répertoire effectivement visé est la racine locale de ce dépôt, et la vérification finale cible `https://repoops.arnaudwissart.fr`.
 
 ## Limites actuelles
 

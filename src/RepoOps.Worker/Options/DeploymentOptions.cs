@@ -10,6 +10,8 @@ public sealed class DeploymentOptions
 
     public string TargetName { get; set; } = "Machine locale";
 
+    public string VerificationUrl { get; set; } = string.Empty;
+
     public string Command { get; set; } = "powershell";
 
     public string Arguments { get; set; } = "-NoProfile -ExecutionPolicy Bypass -File scripts/deploy-local.ps1";

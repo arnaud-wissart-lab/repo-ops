@@ -8,6 +8,8 @@ public sealed class DeploymentExecutionResult
 
     public string TargetName { get; init; } = "machine-locale";
 
+    public string VerificationUrl { get; init; } = string.Empty;
+
     public bool DryRunEnabled { get; init; }
 
     public DateTimeOffset? StartedAtUtc { get; init; }
@@ -21,6 +23,10 @@ public sealed class DeploymentExecutionResult
     public string WorkingDirectory { get; init; } = string.Empty;
 
     public int? ExitCode { get; init; }
+
+    public string VerificationStatus { get; init; } = "NotConfigured";
+
+    public string VerificationMessage { get; init; } = string.Empty;
 
     public string Summary { get; init; } = string.Empty;
 

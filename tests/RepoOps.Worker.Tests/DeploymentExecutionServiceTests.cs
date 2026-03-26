@@ -28,6 +28,7 @@ public sealed class DeploymentExecutionServiceTests
             CancellationToken.None);
 
         Assert.Equal("Disabled", result.Status);
+        Assert.Equal("Skipped", result.VerificationStatus);
         Assert.Contains("désactivé", result.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -43,6 +44,7 @@ public sealed class DeploymentExecutionServiceTests
             {
                 Enabled = true,
                 DryRunEnabled = true,
+                VerificationUrl = "https://repoops.arnaudwissart.fr",
                 Command = "powershell",
                 Arguments = "-File scripts/deploy-local.ps1",
                 DryRunArguments = "-DryRun",
@@ -60,6 +62,8 @@ public sealed class DeploymentExecutionServiceTests
                 CancellationToken.None);
 
             Assert.Equal("DryRun", result.Status);
+            Assert.Equal("Skipped", result.VerificationStatus);
+            Assert.Contains("dry-run", result.VerificationMessage, StringComparison.OrdinalIgnoreCase);
             Assert.Equal("powershell", runner.LastFileName);
             Assert.Contains("-DryRun", runner.LastArguments, StringComparison.Ordinal);
             Assert.True(File.Exists(settings.OutputPath));

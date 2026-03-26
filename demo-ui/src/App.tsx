@@ -491,6 +491,9 @@ export default function App() {
                   {deploymentResult.durationSeconds?.toFixed(1) ?? "0.0"} s
                 </p>
                 <p className="run-scenario-text">
+                  Vérification : {deploymentResult.verificationMessage}
+                </p>
+                <p className="subtle-text">
                   Commande : {deploymentResult.command}
                 </p>
               </div>
@@ -498,8 +501,9 @@ export default function App() {
               <p className="error-text">{deploymentError}</p>
             ) : (
               <p className="subtle-text">
-                Déclenche un déploiement local explicite sur la machine hôte
-                configurée pour ce dépôt.
+                Déclenche un déploiement local explicite de ce dépôt sur la
+                machine hôte, avec contrôle final de
+                {" "}https://repoops.arnaudwissart.fr.
               </p>
             )}
           </div>

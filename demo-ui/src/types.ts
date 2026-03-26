@@ -271,6 +271,7 @@ export interface DeploymentExecutionResult {
   status: string;
   requestedBy: string;
   targetName: string;
+  verificationUrl: string;
   dryRunEnabled: boolean;
   startedAtUtc?: string;
   finishedAtUtc?: string;
@@ -278,6 +279,8 @@ export interface DeploymentExecutionResult {
   command: string;
   workingDirectory: string;
   exitCode?: number;
+  verificationStatus: string;
+  verificationMessage: string;
   summary: string;
   logs: string[];
   errors: string[];

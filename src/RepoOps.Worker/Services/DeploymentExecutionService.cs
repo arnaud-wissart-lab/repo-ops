@@ -33,12 +33,15 @@ public sealed class DeploymentExecutionService(
                 Status = "Disabled",
                 RequestedBy = effectiveRequest.RequestedBy,
                 TargetName = settings.TargetName,
+                VerificationUrl = settings.VerificationUrl,
                 DryRunEnabled = dryRunEnabled,
                 StartedAtUtc = startedAtUtc,
                 FinishedAtUtc = DateTimeOffset.UtcNow,
                 DurationSeconds = 0,
                 Command = commandLine,
                 WorkingDirectory = workingDirectory,
+                VerificationStatus = "Skipped",
+                VerificationMessage = "La vérification publique n'a pas été exécutée car le déploiement est désactivé.",
                 Summary = "Le déploiement local est désactivé par configuration.",
                 Errors = ["Activez DEPLOYMENT_ENABLED pour autoriser le bouton de déploiement."]
             }, cancellationToken);
@@ -51,11 +54,14 @@ public sealed class DeploymentExecutionService(
                 Status = "Failed",
                 RequestedBy = effectiveRequest.RequestedBy,
                 TargetName = settings.TargetName,
+                VerificationUrl = settings.VerificationUrl,
                 DryRunEnabled = dryRunEnabled,
                 StartedAtUtc = startedAtUtc,
                 FinishedAtUtc = DateTimeOffset.UtcNow,
                 DurationSeconds = (DateTimeOffset.UtcNow - startedAtUtc).TotalSeconds,
                 Command = commandLine,
+                VerificationStatus = "Skipped",
+                VerificationMessage = "La vérification publique n'a pas été exécutée car le répertoire cible n'a pas été trouvé.",
                 Summary = "Impossible de localiser le répertoire du dépôt pour déclencher le déploiement.",
                 Errors = ["Le répertoire contenant docker-compose.yml n'a pas été trouvé."]
             }, cancellationToken);
@@ -79,12 +85,18 @@ public sealed class DeploymentExecutionService(
             var status = result.ExitCode == 0
                 ? dryRunEnabled ? "DryRun" : "Succeeded"
                 : "Failed";
+            var verification = await VerifyDeploymentAsync(
+                settings.VerificationUrl,
+                status,
+                dryRunEnabled,
+                cancellationToken);
 
             return await PersistAsync(new DeploymentExecutionResult
             {
                 Status = status,
                 RequestedBy = effectiveRequest.RequestedBy,
                 TargetName = settings.TargetName,
+                VerificationUrl = settings.VerificationUrl,
                 DryRunEnabled = dryRunEnabled,
                 StartedAtUtc = startedAtUtc,
                 FinishedAtUtc = finishedAtUtc,
@@ -92,9 +104,11 @@ public sealed class DeploymentExecutionService(
                 Command = commandLine,
                 WorkingDirectory = workingDirectory,
                 ExitCode = result.ExitCode,
+                VerificationStatus = verification.Status,
+                VerificationMessage = verification.Message,
                 Summary = BuildSummary(status, settings.TargetName, dryRunEnabled, result.ExitCode),
-                Logs = logs,
-                Errors = errors
+                Logs = logs.Concat(verification.Logs).ToArray(),
+                Errors = errors.Concat(verification.Errors).ToArray()
             }, cancellationToken);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -104,12 +118,15 @@ public sealed class DeploymentExecutionService(
                 Status = "Failed",
                 RequestedBy = effectiveRequest.RequestedBy,
                 TargetName = settings.TargetName,
+                VerificationUrl = settings.VerificationUrl,
                 DryRunEnabled = dryRunEnabled,
                 StartedAtUtc = startedAtUtc,
                 FinishedAtUtc = DateTimeOffset.UtcNow,
                 DurationSeconds = (DateTimeOffset.UtcNow - startedAtUtc).TotalSeconds,
                 Command = commandLine,
                 WorkingDirectory = workingDirectory,
+                VerificationStatus = "Skipped",
+                VerificationMessage = "La vérification publique n'a pas été exécutée car le déploiement a dépassé le délai autorisé.",
                 Summary = $"Le déploiement a dépassé le délai autorisé de {settings.TimeoutSeconds} seconde(s).",
                 Errors = [$"Timeout après {settings.TimeoutSeconds} seconde(s)."]
             }, cancellationToken);
@@ -123,15 +140,84 @@ public sealed class DeploymentExecutionService(
                 Status = "Failed",
                 RequestedBy = effectiveRequest.RequestedBy,
                 TargetName = settings.TargetName,
+                VerificationUrl = settings.VerificationUrl,
                 DryRunEnabled = dryRunEnabled,
                 StartedAtUtc = startedAtUtc,
                 FinishedAtUtc = DateTimeOffset.UtcNow,
                 DurationSeconds = (DateTimeOffset.UtcNow - startedAtUtc).TotalSeconds,
                 Command = commandLine,
                 WorkingDirectory = workingDirectory,
+                VerificationStatus = "Skipped",
+                VerificationMessage = "La vérification publique n'a pas été exécutée car le déploiement a échoué avant son déclenchement.",
                 Summary = $"Le déploiement local n'a pas pu être exécuté : {exception.Message}",
                 Errors = [exception.Message]
             }, cancellationToken);
+        }
+    }
+
+    private static async Task<DeploymentVerificationResult> VerifyDeploymentAsync(
+        string verificationUrl,
+        string executionStatus,
+        bool dryRunEnabled,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(verificationUrl))
+        {
+            return new DeploymentVerificationResult(
+                "NotConfigured",
+                "Aucune URL publique n'est configurée pour vérifier le déploiement.",
+                Array.Empty<string>(),
+                Array.Empty<string>());
+        }
+
+        if (dryRunEnabled)
+        {
+            return new DeploymentVerificationResult(
+                "Skipped",
+                $"La vérification de {verificationUrl} n'a pas été exécutée en dry-run.",
+                [$"[verify] Vérification ignorée en dry-run pour {verificationUrl}."],
+                Array.Empty<string>());
+        }
+
+        if (!string.Equals(executionStatus, "Succeeded", StringComparison.OrdinalIgnoreCase))
+        {
+            return new DeploymentVerificationResult(
+                "Skipped",
+                $"La vérification de {verificationUrl} n'a pas été exécutée car le déploiement n'a pas abouti.",
+                Array.Empty<string>(),
+                Array.Empty<string>());
+        }
+
+        try
+        {
+            using var httpClient = new HttpClient
+            {
+                Timeout = TimeSpan.FromSeconds(20)
+            };
+
+            using var response = await httpClient.GetAsync(verificationUrl, cancellationToken);
+            if (response.IsSuccessStatusCode)
+            {
+                return new DeploymentVerificationResult(
+                    "Succeeded",
+                    $"L'URL {verificationUrl} a répondu avec le statut HTTP {(int)response.StatusCode}.",
+                    [$"[verify] {verificationUrl} a répondu avec le statut HTTP {(int)response.StatusCode}."],
+                    Array.Empty<string>());
+            }
+
+            return new DeploymentVerificationResult(
+                "Failed",
+                $"L'URL {verificationUrl} a répondu avec le statut HTTP {(int)response.StatusCode}.",
+                [$"[verify] {verificationUrl} a répondu avec le statut HTTP {(int)response.StatusCode}."],
+                [$"La vérification publique a échoué avec le statut HTTP {(int)response.StatusCode}."]);
+        }
+        catch (Exception exception)
+        {
+            return new DeploymentVerificationResult(
+                "Failed",
+                $"La vérification de {verificationUrl} a échoué : {exception.Message}",
+                Array.Empty<string>(),
+                [exception.Message]);
         }
     }
 
@@ -213,4 +299,10 @@ public sealed class DeploymentExecutionService(
             _ => $"Le déploiement a échoué sur {targetName}. Code de sortie : {exitCode}."
         };
     }
+
+    private sealed record DeploymentVerificationResult(
+        string Status,
+        string Message,
+        IReadOnlyList<string> Logs,
+        IReadOnlyList<string> Errors);
 }

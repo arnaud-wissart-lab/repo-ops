@@ -447,7 +447,8 @@ export const mockDemoRunState: DemoRunState = {
 export const mockDeploymentExecutionResult: DeploymentExecutionResult = {
   status: "DryRun",
   requestedBy: "demo-ui-mock",
-  targetName: "Machine locale",
+  targetName: "repoops.arnaudwissart.fr",
+  verificationUrl: "https://repoops.arnaudwissart.fr",
   dryRunEnabled: true,
   startedAtUtc: "2026-03-26T08:30:12.000Z",
   finishedAtUtc: "2026-03-26T08:30:14.000Z",
@@ -455,8 +456,11 @@ export const mockDeploymentExecutionResult: DeploymentExecutionResult = {
   command: "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-local.ps1 -DryRun",
   workingDirectory: "C:/Users/ArnaudW/source/repos/repo-ops",
   exitCode: 0,
+  verificationStatus: "Skipped",
+  verificationMessage:
+    "La vérification publique de https://repoops.arnaudwissart.fr reste ignorée en dry-run.",
   summary:
-    "Le déploiement a été simulé avec succès pour la machine locale. La stack Docker Compose aurait été reconstruite puis relancée.",
+    "Le déploiement a été simulé avec succès pour repoops.arnaudwissart.fr. La stack Docker Compose aurait été reconstruite puis relancée.",
   logs: [
     "[deploy] Cible : machine locale",
     "[deploy] Répertoire : C:/Users/ArnaudW/source/repos/repo-ops",

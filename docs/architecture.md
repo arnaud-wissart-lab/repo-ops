@@ -57,6 +57,7 @@ Elle :
 
 - appelle les endpoints HTTP existants du worker ;
 - peut déclencher un déploiement local explicite sur la machine hôte configurée ;
+  pour `repo-ops`, ce déploiement vise la racine locale du dépôt et contrôle ensuite `https://repoops.arnaudwissart.fr` ;
 - peut fonctionner en mode API ou en mode mock ;
 - reste en mode démonstration ;
 - n’exécute aucune opération Git ;

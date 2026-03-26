@@ -24,7 +24,7 @@ La page n’exécute pas :
 - de merge réel ;
 - de validation humaine.
 
-Le bouton de déploiement local vise la machine sur laquelle le worker tourne. Dans le mode par défaut, il reste en `dry-run` tant que la configuration backend n’est pas ouverte au réel.
+Le bouton de déploiement local vise la machine sur laquelle le worker tourne. Dans le cas de `repo-ops`, il vise ce dépôt sur la machine personnelle et expose le contrôle public de `https://repoops.arnaudwissart.fr`. Dans le mode par défaut, il reste en `dry-run` tant que la configuration backend n’est pas ouverte au réel.
 
 ## Structure frontend
 

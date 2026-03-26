@@ -13,6 +13,11 @@ on:
         required: true
         default: main
         type: string
+      debug:
+        description: "Active des logs de diagnostic plus bavards"
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -28,6 +33,7 @@ jobs:
       SSH_USER: ${{ secrets.SSH_USER }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
       SSH_PORT: ${{ secrets.SSH_PORT }}
+      DEPLOY_DEBUG: ${{ inputs.debug }}
 
     steps:
       - name: Checkout de la référence demandée
@@ -36,21 +42,46 @@ jobs:
           ref: ${{ inputs.ref }}
 
       - name: Afficher le contexte de déploiement
+        shell: bash
         run: |
           echo "Environnement: $DEPLOY_ENVIRONMENT"
           echo "Référence Git: $DEPLOY_REF"
           echo "Runner: $RUNNER_NAME"
+          echo "Dépôt: $GITHUB_REPOSITORY"
+          echo "Mode debug: $DEPLOY_DEBUG"
+
+      - name: Vérifier le prérequis runner et secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "SSH_HOST configuré: $([ -n "${SSH_HOST:-}" ] && echo oui || echo non)"
+          echo "SSH_USER configuré: $([ -n "${SSH_USER:-}" ] && echo oui || echo non)"
+          echo "SSH_PRIVATE_KEY configurée: $([ -n "${SSH_PRIVATE_KEY:-}" ] && echo oui || echo non)"
+          echo "SSH_PORT effectif: ${SSH_PORT:-22}"
+
+          command -v ssh
+          command -v ssh-keyscan
+          command -v bash
+          command -v git
+
+          test -f scripts/deploy-home.sh
+          ls -l scripts/deploy-home.sh
 
       - name: Setup SSH known_hosts
+        shell: bash
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
+          echo "Ajout de la clé hôte SSH pour ${SSH_HOST}:${SSH_PORT:-22}"
           ssh-keyscan -p "${SSH_PORT:-22}" -H "$SSH_HOST" >> ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
       - name: Exécuter le déploiement home
+        shell: bash
         run: |
           set -euo pipefail
+          echo "Lancement du script scripts/deploy-home.sh"
           chmod +x scripts/deploy-home.sh
-          scripts/deploy-home.sh
+          bash scripts/deploy-home.sh

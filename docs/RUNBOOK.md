@@ -10,6 +10,7 @@ Paramètres `workflow_dispatch` :
 
 - `environment` (défaut : `home`)
 - `ref` (défaut : `main`)
+- `debug` (défaut : `true`)
 
 Runner cible :
 
@@ -25,6 +26,13 @@ Secrets requis côté GitHub :
 Script appelé par le workflow :
 
 - [`scripts/deploy-home.sh`](../scripts/deploy-home.sh)
+
+Le workflow ajoute aussi un préflight minimal :
+
+- présence des secrets SSH ;
+- présence des commandes `ssh`, `ssh-keyscan`, `bash` et `git` sur le runner ;
+- visibilité du script de déploiement ;
+- ajout explicite de `known_hosts`.
 
 ## CI GitHub Actions
 

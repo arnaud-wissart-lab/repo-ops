@@ -5,6 +5,12 @@ log() {
   printf '[deploy-home] %s\n' "$1"
 }
 
+fail() {
+  local line_number="$1"
+  local command_text="$2"
+  printf '[deploy-home] Échec local à la ligne %s sur la commande: %s\n' "$line_number" "$command_text" >&2
+}
+
 require_env() {
   local var_name="$1"
   if [ -z "${!var_name:-}" ]; then
@@ -19,6 +25,8 @@ debug() {
     printf '[deploy-home][debug] %s\n' "$1"
   fi
 }
+
+trap 'fail "$LINENO" "$BASH_COMMAND"' ERR
 
 : "${SSH_PORT:=22}"
 : "${DEPLOY_REF:=main}"
@@ -47,13 +55,27 @@ esac
 REPO_SLUG="${GITHUB_REPOSITORY}"
 REPO_TOKEN="${GITHUB_TOKEN}"
 
+require_cmd() {
+  local cmd="$1"
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    log "Commande requise introuvable sur le runner: ${cmd}"
+    exit 1
+  fi
+}
+
 if [ "$DEPLOY_ENVIRONMENT" != "home" ]; then
   log "Environnement '${DEPLOY_ENVIRONMENT}' non reconnu pour ce script (attendu: home)."
   exit 1
 fi
 
+require_cmd ssh
+require_cmd mktemp
+require_cmd chmod
+require_cmd base64
+
 log "Déploiement de ${REPO_SLUG}@${DEPLOY_REF} vers ${SSH_USER}@${SSH_HOST}:${SSH_PORT}."
 debug "Mode debug activé."
+debug "Contexte local: dépôt=${REPO_SLUG}, environnement=${DEPLOY_ENVIRONMENT}, ref=${DEPLOY_REF}."
 
 ssh_key_file="$(mktemp)"
 cleanup() {
@@ -64,6 +86,7 @@ trap cleanup EXIT
 umask 077
 printf '%s\n' "$SSH_PRIVATE_KEY" >"$ssh_key_file"
 chmod 600 "$ssh_key_file"
+debug "Clé SSH temporaire créée dans ${ssh_key_file}."
 
 ssh_opts=(
   -i "$ssh_key_file"
@@ -73,6 +96,9 @@ ssh_opts=(
   -o ConnectTimeout=10
 )
 
+debug "Test de connectivité SSH vers ${SSH_USER}@${SSH_HOST}:${SSH_PORT}."
+ssh "${ssh_opts[@]}" "${SSH_USER}@${SSH_HOST}" "echo '[remote] Connexion SSH établie.'"
+
 ssh "${ssh_opts[@]}" "${SSH_USER}@${SSH_HOST}" \
   bash -se -- "$DEPLOY_REF" "$REPO_SLUG" "$REPO_TOKEN" "$DEBUG_ENABLED" <<'REMOTE_SCRIPT'
 set -euo pipefail
@@ -81,12 +107,20 @@ log() {
   printf '[remote] %s\n' "$1"
 }
 
+fail() {
+  local line_number="$1"
+  local command_text="$2"
+  printf '[remote] Échec à la ligne %s sur la commande: %s\n' "$line_number" "$command_text" >&2
+}
+
 DEPLOY_DEBUG_MODE="${4:-0}"
 debug() {
   if [ "$DEPLOY_DEBUG_MODE" -eq 1 ]; then
     printf '[remote][debug] %s\n' "$1"
   fi
 }
+
+trap 'fail "$LINENO" "$BASH_COMMAND"' ERR
 
 require_cmd() {
   local cmd="$1"
@@ -130,6 +164,10 @@ ENV_EXAMPLE_PATH="${APP_DIR}/${ENV_EXAMPLE_FILE}"
 require_cmd git
 require_cmd docker
 require_cmd curl
+require_cmd base64
+
+log "Script distant initialisé."
+debug "Contexte distant: ref=${DEPLOY_REF}, repo=${REPO_SLUG}, app_dir=${APP_DIR}."
 
 compose_cmd=()
 if docker compose version >/dev/null 2>&1; then
@@ -143,6 +181,7 @@ fi
 
 log "Préparation du dossier ${APP_DIR}"
 mkdir -p "$APP_PARENT_DIR"
+debug "Parent du dossier applicatif: ${APP_PARENT_DIR}."
 
 if [ ! -d "$APP_DIR/.git" ]; then
   log "Repository absent, clonage initial."
@@ -153,6 +192,7 @@ if [ ! -d "$APP_DIR/.git" ]; then
 fi
 
 cd "$APP_DIR"
+debug "Répertoire courant distant: $(pwd)"
 git remote set-url origin "$REPO_URL"
 
 log "Mise à jour Git et résolution de la référence ${DEPLOY_REF}"
@@ -194,6 +234,7 @@ fi
 
 log "Validation de la configuration Compose"
 "${compose_cmd[@]}" --env-file "$ENV_FILE_PATH" -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE_PATH" config >/dev/null
+debug "Validation Compose OK."
 
 log "Build et démarrage de la stack home via docker compose"
 "${compose_cmd[@]}" --env-file "$ENV_FILE_PATH" -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE_PATH" up -d --build --remove-orphans

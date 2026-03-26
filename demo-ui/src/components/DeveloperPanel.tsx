@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DeveloperLogEntry, DemoRunState } from "../types";
 import { formatDateTime, toPrettyJson } from "../utils";
 
@@ -12,6 +12,16 @@ type TabKey = "logs" | "json";
 export function DeveloperPanel({ logs, run }: DeveloperPanelProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("logs");
   const [copied, setCopied] = useState(false);
+  const [autoScroll, setAutoScroll] = useState(true);
+  const consoleRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!autoScroll || activeTab !== "logs" || !consoleRef.current) {
+      return;
+    }
+
+    consoleRef.current.scrollTop = consoleRef.current.scrollHeight;
+  }, [activeTab, autoScroll, logs]);
 
   async function copyJson() {
     if (!run) {
@@ -49,7 +59,18 @@ export function DeveloperPanel({ logs, run }: DeveloperPanelProps) {
       </div>
 
       {activeTab === "logs" ? (
-        <div className="developer-console">
+        <>
+          <div className="developer-toolbar">
+            <label className="toggle-option">
+              <input
+                type="checkbox"
+                checked={autoScroll}
+                onChange={(event) => setAutoScroll(event.target.checked)}
+              />
+              <span>Auto-scroll</span>
+            </label>
+          </div>
+          <div ref={consoleRef} className="developer-console">
           {logs.length === 0 ? (
             <p className="empty-state">Aucun log disponible pour l’instant.</p>
           ) : (
@@ -62,7 +83,8 @@ export function DeveloperPanel({ logs, run }: DeveloperPanelProps) {
               </div>
             ))
           )}
-        </div>
+          </div>
+        </>
       ) : (
         <div className="json-panel">
           <div className="json-toolbar">

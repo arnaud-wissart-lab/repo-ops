@@ -5,6 +5,14 @@ interface PipelineVisualizerProps {
 }
 
 export function PipelineVisualizer({ steps }: PipelineVisualizerProps) {
+  const stateLabels: Record<PipelineStep["state"], string> = {
+    idle: "En attente",
+    running: "En cours",
+    done: "Terminé",
+    warning: "Vigilance",
+    failed: "Erreur",
+  };
+
   return (
     <section className="panel">
       <div className="panel-header">
@@ -18,9 +26,10 @@ export function PipelineVisualizer({ steps }: PipelineVisualizerProps) {
         </p>
       </div>
 
-      <div className="pipeline-grid">
+      <div className="pipeline-timeline">
         {steps.map((step, index) => (
           <article key={step.key} className={`pipeline-step pipeline-step-${step.state}`}>
+            {index < steps.length - 1 ? <span className="pipeline-connector" aria-hidden="true" /> : null}
             <div className="pipeline-marker">
               <span>{index + 1}</span>
             </div>
@@ -30,7 +39,7 @@ export function PipelineVisualizer({ steps }: PipelineVisualizerProps) {
             </div>
             <div className={`pipeline-state pipeline-state-${step.state}`}>
               <span className="pipeline-dot" />
-              <span>{step.state}</span>
+              <span>{stateLabels[step.state]}</span>
             </div>
           </article>
         ))}

@@ -7,11 +7,11 @@ interface KpiGridProps {
 }
 
 const items = [
-  { key: "analyzed", label: "PR analysées" },
-  { key: "ready", label: "PR prêtes" },
-  { key: "blocked", label: "PR bloquées" },
-  { key: "vulnerabilities", label: "Vulnérabilités" },
-  { key: "actions", label: "Actions proposées" },
+  { key: "analyzed", label: "PR analysées", icon: "PR", tone: "neutral" },
+  { key: "ready", label: "PR prêtes", icon: "OK", tone: "done" },
+  { key: "blocked", label: "PR bloquées", icon: "BL", tone: "warning" },
+  { key: "vulnerabilities", label: "Vulnérabilités", icon: "SEC", tone: "failed" },
+  { key: "actions", label: "Actions proposées", icon: "ACT", tone: "info" },
 ] as const;
 
 export function KpiGrid({
@@ -32,9 +32,13 @@ export function KpiGrid({
   return (
     <section className="kpi-grid">
       {items.map((item) => (
-        <article key={item.key} className="kpi-card">
-          <p>{item.label}</p>
+        <article key={item.key} className={`kpi-card kpi-card-${item.tone}`}>
+          <div className="kpi-topline">
+            <span className="kpi-icon">{item.icon}</span>
+            <p>{item.label}</p>
+          </div>
           <strong>{values[item.key]}</strong>
+          <span className="kpi-caption">Lecture instantanée du run</span>
         </article>
       ))}
     </section>

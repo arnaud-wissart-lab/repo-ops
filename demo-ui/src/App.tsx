@@ -9,6 +9,7 @@ import {
 } from "./api";
 import { DecisionSection } from "./components/DecisionSection";
 import { DeveloperPanel } from "./components/DeveloperPanel";
+import { GlobalStatusBanner } from "./components/GlobalStatusBanner";
 import { HeroSection } from "./components/HeroSection";
 import { KpiGrid } from "./components/KpiGrid";
 import { PipelineVisualizer } from "./components/PipelineVisualizer";
@@ -136,32 +137,27 @@ export default function App() {
     }));
   }
 
+  async function animateStep(
+    step: PipelineStepKey,
+    finalState: PipelineStepState,
+    delay = 180,
+  ) {
+    setStepState(step, "running");
+    await wait(delay);
+    setStepState(step, finalState);
+  }
+
   async function executeMockScenario() {
     appendLog(createLogEntry("INFO", "ui", "Chargement d’un scénario mock réaliste."));
     const mockRun = getMockDemoRunState();
 
-    setStepState("github", "running");
-    await wait(240);
-    setStepState("github", "warning");
-
-    setStepState("analysis", "running");
-    await wait(200);
-    setStepState("analysis", reportTone(mockRun.report));
-
-    setStepState("decision", "running");
-    await wait(180);
-    setStepState("decision", "done");
-
-    setStepState("prompts", "running");
-    await wait(180);
-    setStepState("prompts", "done");
-
-    setStepState("codex", "running");
-    await wait(220);
-    setStepState("codex", "done");
-
-    setStepState("validation", "warning");
-    setStepState("result", "done");
+    await animateStep("github", "warning", 240);
+    await animateStep("analysis", reportTone(mockRun.report), 200);
+    await animateStep("decision", "done", 180);
+    await animateStep("prompts", "done", 180);
+    await animateStep("codex", "done", 220);
+    await animateStep("validation", "warning", 120);
+    await animateStep("result", "done", 120);
 
     setRun(mockRun);
     setLogs((current) => [
@@ -197,6 +193,7 @@ export default function App() {
     );
 
     setStepState("decision", "running");
+    await wait(100);
     const decisions = await buildSupervisorDecisions(report);
     setStepState("decision", decisions.actions.length > 0 ? "done" : "warning");
     appendLog(
@@ -208,6 +205,7 @@ export default function App() {
     );
 
     setStepState("prompts", "running");
+    await wait(100);
     const prompts = await buildSupervisorPrompts(decisions);
     setStepState("prompts", prompts.prompts.length > 0 ? "done" : "warning");
     appendLog(
@@ -219,6 +217,7 @@ export default function App() {
     );
 
     setStepState("codex", "running");
+    await wait(100);
     const codex = await executeCodexPrompts(prompts);
     setStepState("codex", codex.responses.length > 0 ? "done" : "warning");
     appendLog(
@@ -229,8 +228,8 @@ export default function App() {
       ),
     );
 
-    setStepState("validation", "warning");
-    setStepState("result", reportTone(report));
+    await animateStep("validation", "warning", 110);
+    await animateStep("result", reportTone(report), 110);
     appendLog(
       createLogEntry(
         "WARN",
@@ -380,6 +379,8 @@ export default function App() {
             </ul>
           </div>
         </section>
+
+        {report ? <GlobalStatusBanner report={report} /> : null}
 
         <PipelineVisualizer steps={toPipelineSteps(pipelineStates)} />
 

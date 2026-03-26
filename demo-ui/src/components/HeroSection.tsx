@@ -26,6 +26,8 @@ export function HeroSection({
   onRun,
   onLoadMock,
 }: HeroSectionProps) {
+  const isLoading = status === "loading";
+
   return (
     <header className="hero-panel">
       <div className="hero-copy">
@@ -62,21 +64,29 @@ export function HeroSection({
         <div className="hero-actions">
           <button
             type="button"
-            className="primary-button"
+            className={isLoading ? "primary-button is-loading" : "primary-button"}
             onClick={() => void onRun()}
-            disabled={status === "loading"}
+            disabled={isLoading}
           >
-            {status === "loading" ? "Analyse en cours..." : "Lancer une analyse"}
+            <span className="primary-button-content">
+              {isLoading ? <span className="button-spinner" aria-hidden="true" /> : null}
+              <span>{isLoading ? "Analyse en cours..." : "Lancer une analyse"}</span>
+            </span>
           </button>
           <button
             type="button"
             className="secondary-button"
             onClick={() => void onLoadMock()}
-            disabled={status === "loading"}
+            disabled={isLoading}
           >
             Charger un exemple
           </button>
         </div>
+        <p className="hero-feedback">
+          {isLoading
+            ? "Le pipeline se déroule étape par étape pour rendre l’exécution lisible."
+            : "Le déclenchement reste strictement en dry-run et ne lance aucune action irréversible."}
+        </p>
       </aside>
     </header>
   );

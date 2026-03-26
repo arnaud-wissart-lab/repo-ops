@@ -5,6 +5,28 @@ interface DecisionSectionProps {
   actions: SupervisorAction[];
 }
 
+function typeMeta(type: string): {
+  label: string;
+  icon: string;
+  tone: "done" | "warning" | "failed" | "neutral";
+} {
+  const normalized = type.toLowerCase();
+
+  if (normalized === "automergeeligible") {
+    return { label: "Auto-merge éligible", icon: "AM", tone: "done" };
+  }
+
+  if (normalized === "fixrequired") {
+    return { label: "Correctif requis", icon: "FX", tone: "failed" };
+  }
+
+  if (normalized === "review") {
+    return { label: "Revue", icon: "RV", tone: "warning" };
+  }
+
+  return { label: "Ignoré", icon: "IG", tone: "neutral" };
+}
+
 function toneFromPriority(priority: string): "done" | "warning" | "failed" | "neutral" {
   const normalized = priority.toLowerCase();
 
@@ -50,7 +72,17 @@ export function DecisionSection({ actions }: DecisionSectionProps) {
             >
               <div className="decision-topline">
                 <div>
-                  <p className="decision-type">{action.type}</p>
+                  <div className="decision-badges">
+                    <span className={`decision-type-badge decision-type-badge-${typeMeta(action.type).tone}`}>
+                      <span className="decision-type-icon">{typeMeta(action.type).icon}</span>
+                      <span>{typeMeta(action.type).label}</span>
+                    </span>
+                    {action.isSecurityRelated ? (
+                      <span className="decision-security-badge">
+                        SEC {action.securitySeverity || "prioritaire"}
+                      </span>
+                    ) : null}
+                  </div>
                   <h3>{action.pullRequestTitle || action.repository}</h3>
                 </div>
                 <StatusPill label={action.priority} tone={toneFromPriority(action.priority)} />
@@ -60,6 +92,7 @@ export function DecisionSection({ actions }: DecisionSectionProps) {
                 <span>{action.repository}</span>
                 {action.pullRequestNumber ? <span>PR #{action.pullRequestNumber}</span> : null}
                 {action.checksStatus ? <span>Checks : {action.checksStatus}</span> : null}
+                <span>Statut : {typeMeta(action.type).label}</span>
               </div>
 
               <p>{action.reason}</p>

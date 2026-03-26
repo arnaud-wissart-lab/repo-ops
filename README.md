@@ -88,6 +88,8 @@ Le dossier `scripts/` reste présent pour la transition, mais il ne fait plus pa
    - [`supervisor-decisions.txt`](./reports/supervisor-decisions.txt)
    - [`supervisor-prompts.json`](./reports/supervisor-prompts.json)
    - [`supervisor-prompts.txt`](./reports/supervisor-prompts.txt)
+   - [`supervisor-codex-responses.json`](./reports/supervisor-codex-responses.json)
+   - [`supervisor-codex-responses.txt`](./reports/supervisor-codex-responses.txt)
    - [`renovate-execution.json`](./reports/renovate-execution.json) lorsqu'une exécution explicite de `Renovate` est lancée via le worker
    Le worker interroge GitHub avec `GITHUB_TOKEN` pour récupérer les PR Renovate ouvertes, les PR Renovate fusionnées récemment, les fermetures sans fusion récentes, les checks utiles à la qualification opérationnelle, les `Dependabot alerts` ouvertes et corrigées quand elles sont disponibles, ainsi que les informations nécessaires à une décision d’auto-merge contrôlé.
 5. `n8n` lit le JSON renvoyé directement par l’API du worker.
@@ -180,6 +182,66 @@ Usage avec Codex :
 - choisir explicitement le prompt à utiliser ;
 - coller ce prompt dans Codex pour obtenir une analyse, une revue ou une proposition de correction ;
 - garder la décision humaine sur l’exécution réelle.
+
+## Codex Executor contrôlé
+
+L’exécuteur contrôlé consomme les prompts déjà générés et produit une réponse structurée, sans jamais exécuter automatiquement de modification.
+
+Principes retenus :
+
+- le worker reste le point d’entrée ;
+- l’intégration passe par une interface `ICodexClient` ;
+- le mode actif par défaut est `Stub` ;
+- aucune API externe n’est appelée tant qu’aucun client réel n’est branché ;
+- chaque réponse porte `requiresHumanValidation=true` et `readyForExecution=false`.
+
+Sorties produites :
+
+- [`supervisor-codex-responses.json`](./reports/supervisor-codex-responses.json)
+- [`supervisor-codex-responses.txt`](./reports/supervisor-codex-responses.txt)
+
+Types de réponse actuellement structurés :
+
+- `Analysis`
+- `ProposedFix`
+- `Refactor`
+
+Mode CLI à partir des prompts déjà générés :
+
+```powershell
+dotnet run --project .\src\RepoOps.Worker -- --execute-prompts --prompts-path=reports/supervisor-prompts.json --emit-json-to-stdout
+```
+
+Mode HTTP à partir d’un JSON de prompts :
+
+```powershell
+Invoke-WebRequest -Uri "http://127.0.0.1:8080/supervisor/codex/execute" -Method Post -ContentType "application/json" -InFile ".\reports\supervisor-prompts.json" | Select-Object -ExpandProperty Content
+```
+
+Exemple de réponse structurée :
+
+```json
+{
+  "executorMode": "Stub",
+  "summary": {
+    "totalResponses": 1,
+    "analysisResponses": 1,
+    "proposedFixResponses": 0,
+    "refactorResponses": 0
+  },
+  "responses": [
+    {
+      "repository": "owner/repo-a",
+      "pullRequestNumber": 42,
+      "promptType": "review",
+      "responseType": "Analysis",
+      "confidenceLevel": "Medium",
+      "requiresHumanValidation": true,
+      "readyForExecution": false
+    }
+  ]
+}
+```
 
 ## Auto-merge contrôlé
 
@@ -348,6 +410,8 @@ Cette couche Aspire sert au pilotage local. Pour les exécutions réelles de la 
 - le worker expose désormais une API locale simple, mais sans authentification dédiée à ce stade car elle reste confinée au réseau Docker interne ;
 - le superviseur IA actuel est uniquement un moteur de décisions à règles fixes ; il n’orchestre encore aucun agent ni aucune exécution de tâche ;
 - le générateur de prompts prépare des prompts prêts à l’emploi, mais ne contacte jamais Codex et ne déclenche aucune exécution ;
+- l’exécuteur contrôlé produit aujourd’hui des réponses simulées et structurées via un client `Stub`, sans appeler réellement Codex ;
+- aucune réponse générée n’est exécutable directement ; une validation humaine reste obligatoire avant toute utilisation ;
 - la configuration SMTP et les destinataires restent à finaliser manuellement dans `n8n` ;
 - le workflow quotidien exploite le dernier résultat connu de `Renovate`, mais ne le relance pas automatiquement ;
 - les sorties du superviseur et des prompts restent distinctes du rapport principal et ne sont pas encore consommées par `n8n`.
@@ -369,9 +433,11 @@ Invoke-WebRequest -Uri "http://127.0.0.1:8080/health" | Select-Object -ExpandPro
 Invoke-WebRequest -Uri "http://127.0.0.1:8080/maintenance/run" -Method Post -ContentType "application/json" -Body '{"inputSource":"validation-http","triggerRenovateExecution":false}' | Select-Object -ExpandProperty Content
 Invoke-WebRequest -Uri "http://127.0.0.1:8080/supervisor/decisions" -Method Post -ContentType "application/json" -InFile ".\reports\worker-summary.json" | Select-Object -ExpandProperty Content
 Invoke-WebRequest -Uri "http://127.0.0.1:8080/supervisor/prompts" -Method Post -ContentType "application/json" -InFile ".\src\RepoOps.Worker\reports\supervisor-decisions.json" | Select-Object -ExpandProperty Content
+Invoke-WebRequest -Uri "http://127.0.0.1:8080/supervisor/codex/execute" -Method Post -ContentType "application/json" -InFile ".\src\RepoOps.Worker\reports\supervisor-prompts.json" | Select-Object -ExpandProperty Content
 dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --run-once --emit-json-to-stdout --input-source=validation-cli
 dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --decide --report-path=reports/worker-summary.json --emit-json-to-stdout
 dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --generate-prompts --decisions-path=reports/supervisor-decisions.json --emit-json-to-stdout
+dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --execute-prompts --prompts-path=reports/supervisor-prompts.json --emit-json-to-stdout
 dotnet run --project .\src\RepoOps.Worker -- --run-once --run-renovate --emit-json-to-stdout --input-source=validation-renovate
 $env:AUTOMERGE_ENABLED="true"
 $env:AUTOMERGE_DRY_RUN_ENABLED="true"
@@ -543,5 +609,24 @@ Exemple de prompt généré :
     "recommendation": "Traiter la cause d'échec ou le sujet de sécurité avant toute autre action."
   },
   "promptText": "Contexte\n- Dépôt cible : owner/repo-a\n- Cible précise : owner/repo-a#101\n..."
+}
+```
+
+Exemple de réponse structurée issue de l’exécuteur contrôlé :
+
+```json
+{
+  "executorMode": "Stub",
+  "responses": [
+    {
+      "repository": "owner/repo-a",
+      "pullRequestNumber": 101,
+      "responseType": "ProposedFix",
+      "confidenceLevel": "Medium",
+      "requiresHumanValidation": true,
+      "readyForExecution": false,
+      "summary": "Réponse simulée orientée correction, à relire avant toute modification manuelle."
+    }
+  ]
 }
 ```

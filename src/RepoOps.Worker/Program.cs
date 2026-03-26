@@ -7,6 +7,7 @@ using RepoOps.Worker.Services;
 var runOnceRequested = args.Any(arg => string.Equals(arg, "--run-once", StringComparison.OrdinalIgnoreCase));
 var decideRequested = args.Any(arg => string.Equals(arg, "--decide", StringComparison.OrdinalIgnoreCase));
 var generatePromptsRequested = args.Any(arg => string.Equals(arg, "--generate-prompts", StringComparison.OrdinalIgnoreCase));
+var executePromptsRequested = args.Any(arg => string.Equals(arg, "--execute-prompts", StringComparison.OrdinalIgnoreCase));
 var builder = WebApplication.CreateBuilder(ParsePassthroughArguments(args));
 
 builder.Configuration.AddInMemoryCollection(ParseWorkerOverrides(args));
@@ -79,7 +80,29 @@ builder.Services.AddOptions<GitHubOptions>()
             options.RecentMergedWindowDays = recentMergedWindowDays;
         }
     });
+builder.Services.AddOptions<CodexExecutorOptions>()
+    .Configure<IConfiguration>((options, configuration) =>
+    {
+        configuration.GetSection(CodexExecutorOptions.SectionName).Bind(options);
+        options.Mode = configuration["CODEX_EXECUTOR_MODE"] ?? options.Mode;
+        options.OutputPath = configuration["CODEX_RESPONSE_OUTPUT_PATH"] ?? options.OutputPath;
+        options.DigestOutputPath = configuration["CODEX_RESPONSE_DIGEST_OUTPUT_PATH"] ?? options.DigestOutputPath;
+    });
 builder.Services.AddHttpClient<GitHubApiClient>();
+builder.Services.AddSingleton<ICodexClient>(serviceProvider =>
+{
+    var settings = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<CodexExecutorOptions>>().Value;
+    var logger = serviceProvider.GetRequiredService<ILogger<Program>>();
+
+    if (!string.Equals(settings.Mode, "Stub", StringComparison.OrdinalIgnoreCase))
+    {
+        logger.LogWarning(
+            "Le mode Codex '{ConfiguredMode}' n'est pas pris en charge dans ce lot. Le client simulé est conservé.",
+            settings.Mode);
+    }
+
+    return ActivatorUtilities.CreateInstance<StubCodexClient>(serviceProvider);
+});
 builder.Services.AddSingleton<GitHubMaintenanceCollector>();
 builder.Services.AddSingleton<VulnerabilityAssessmentService>();
 builder.Services.AddSingleton<PullRequestDecisionService>();
@@ -97,6 +120,10 @@ builder.Services.AddSingleton<PromptGeneratorService>();
 builder.Services.AddSingleton<PromptDigestRenderer>();
 builder.Services.AddSingleton<PromptPersistenceService>();
 builder.Services.AddSingleton<PromptGenerationWorkflowService>();
+builder.Services.AddSingleton<CodexExecutorService>();
+builder.Services.AddSingleton<CodexExecutionDigestRenderer>();
+builder.Services.AddSingleton<CodexExecutionPersistenceService>();
+builder.Services.AddSingleton<CodexExecutionWorkflowService>();
 
 var app = builder.Build();
 
@@ -104,6 +131,7 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.MapPost("/maintenance/run", RunMaintenanceHttpAsync);
 app.MapPost("/supervisor/decisions", RunSupervisorHttpAsync);
 app.MapPost("/supervisor/prompts", RunPromptGenerationHttpAsync);
+app.MapPost("/supervisor/codex/execute", RunCodexExecutionHttpAsync);
 
 if (runOnceRequested)
 {
@@ -185,6 +213,28 @@ if (generatePromptsRequested)
     catch (Exception exception)
     {
         app.Logger.LogError(exception, "Le générateur de prompts CLI a échoué");
+        Environment.ExitCode = 1;
+        return;
+    }
+}
+
+if (executePromptsRequested)
+{
+    var emitJsonToStdout = app.Configuration.GetValue<bool>($"{RepoOpsWorkerOptions.SectionName}:EmitJsonToStdout");
+    var promptsPath = app.Configuration[$"{CodexExecutorOptions.SectionName}:InputPromptPath"];
+
+    try
+    {
+        await RunCodexExecutionFromPromptPathAsync(
+            app.Services,
+            promptsPath,
+            emitJsonToStdout,
+            CancellationToken.None);
+        return;
+    }
+    catch (Exception exception)
+    {
+        app.Logger.LogError(exception, "L'exécuteur contrôlé CLI a échoué");
         Environment.ExitCode = 1;
         return;
     }
@@ -297,6 +347,33 @@ static async Task<Results<JsonHttpResult<GeneratedPromptResult>, ProblemHttpResu
     }
 }
 
+static async Task<Results<JsonHttpResult<CodexExecutionResult>, ProblemHttpResult>> RunCodexExecutionHttpAsync(
+    GeneratedPromptResult prompts,
+    IServiceProvider services,
+    ILogger<Program> logger,
+    CancellationToken cancellationToken)
+{
+    try
+    {
+        var result = await RunCodexExecutionAsync(
+            services,
+            prompts,
+            emitJsonToStdout: false,
+            cancellationToken);
+
+        return TypedResults.Json(result, statusCode: StatusCodes.Status200OK);
+    }
+    catch (Exception exception)
+    {
+        logger.LogError(exception, "L'exécuteur contrôlé HTTP a échoué");
+
+        return TypedResults.Problem(
+            title: "Erreur interne",
+            detail: "L'exécuteur contrôlé n'a pas pu produire de réponses exploitables.",
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+}
+
 static async Task<MaintenanceRunReport> RunMaintenanceAsync(
     IServiceProvider services,
     MaintenanceRunRequest request,
@@ -369,6 +446,30 @@ static async Task<GeneratedPromptResult> RunPromptGenerationFromReportPathAsync(
     return await workflowService.RunFromReportPathAsync(reportPath ?? string.Empty, emitJsonToStdout, cancellationToken);
 }
 
+static async Task<CodexExecutionResult> RunCodexExecutionAsync(
+    IServiceProvider services,
+    GeneratedPromptResult prompts,
+    bool emitJsonToStdout,
+    CancellationToken cancellationToken)
+{
+    await using var scope = services.CreateAsyncScope();
+    var workflowService = scope.ServiceProvider.GetRequiredService<CodexExecutionWorkflowService>();
+
+    return await workflowService.RunAsync(prompts, emitJsonToStdout, cancellationToken);
+}
+
+static async Task<CodexExecutionResult> RunCodexExecutionFromPromptPathAsync(
+    IServiceProvider services,
+    string? promptsPath,
+    bool emitJsonToStdout,
+    CancellationToken cancellationToken)
+{
+    await using var scope = services.CreateAsyncScope();
+    var workflowService = scope.ServiceProvider.GetRequiredService<CodexExecutionWorkflowService>();
+
+    return await workflowService.RunFromPromptPathAsync(promptsPath, emitJsonToStdout, cancellationToken);
+}
+
 static MaintenanceRunRequest ResolveCliRequest(IConfiguration configuration)
 {
     return new MaintenanceRunRequest
@@ -419,6 +520,7 @@ static string[] ParsePassthroughArguments(IEnumerable<string> args) =>
     args.Where(arg => !arg.StartsWith("--run-once", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--decide", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--generate-prompts", StringComparison.OrdinalIgnoreCase)
+        && !arg.StartsWith("--execute-prompts", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--run-renovate", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--enable-auto-merge", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--disable-auto-merge-dry-run", StringComparison.OrdinalIgnoreCase)
@@ -426,7 +528,8 @@ static string[] ParsePassthroughArguments(IEnumerable<string> args) =>
         && !arg.StartsWith("--emit-json-to-stdout", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--input-source=", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--report-path=", StringComparison.OrdinalIgnoreCase)
-        && !arg.StartsWith("--decisions-path=", StringComparison.OrdinalIgnoreCase))
+        && !arg.StartsWith("--decisions-path=", StringComparison.OrdinalIgnoreCase)
+        && !arg.StartsWith("--prompts-path=", StringComparison.OrdinalIgnoreCase))
         .ToArray();
 
 static Dictionary<string, string?> ParseWorkerOverrides(IEnumerable<string> args)
@@ -446,6 +549,11 @@ static Dictionary<string, string?> ParseWorkerOverrides(IEnumerable<string> args
         }
 
         if (string.Equals(arg, "--generate-prompts", StringComparison.OrdinalIgnoreCase))
+        {
+            continue;
+        }
+
+        if (string.Equals(arg, "--execute-prompts", StringComparison.OrdinalIgnoreCase))
         {
             continue;
         }
@@ -520,6 +628,13 @@ static Dictionary<string, string?> ParseWorkerOverrides(IEnumerable<string> args
         if (arg.StartsWith(decisionsPathPrefix, StringComparison.OrdinalIgnoreCase))
         {
             overrides["RepoOps:Worker:SupervisorInputDecisionPath"] = arg[decisionsPathPrefix.Length..];
+            continue;
+        }
+
+        const string promptsPathPrefix = "--prompts-path=";
+        if (arg.StartsWith(promptsPathPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            overrides["RepoOps:Codex:InputPromptPath"] = arg[promptsPathPrefix.Length..];
             continue;
         }
     }

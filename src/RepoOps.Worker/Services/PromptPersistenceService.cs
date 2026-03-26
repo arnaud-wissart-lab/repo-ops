@@ -27,6 +27,28 @@ public sealed class PromptPersistenceService(IOptions<RepoOpsWorkerOptions> opti
             cancellationToken);
     }
 
+    public async Task<GeneratedPromptResult> LoadAsync(string promptPath, CancellationToken cancellationToken)
+    {
+        var fullPath = Path.GetFullPath(promptPath);
+
+        if (!File.Exists(fullPath))
+        {
+            throw new FileNotFoundException(
+                $"Le fichier de prompts '{fullPath}' est introuvable.",
+                fullPath);
+        }
+
+        var json = await File.ReadAllTextAsync(fullPath, cancellationToken);
+        var result = JsonSerializer.Deserialize<GeneratedPromptResult>(json, JsonOptions);
+
+        if (result is null)
+        {
+            throw new InvalidOperationException($"Le fichier de prompts '{fullPath}' est invalide ou vide.");
+        }
+
+        return result;
+    }
+
     public string Serialize(GeneratedPromptResult result) => JsonSerializer.Serialize(result, JsonOptions);
 
     private static async Task WriteFileAsync(

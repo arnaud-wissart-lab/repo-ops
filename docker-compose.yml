@@ -30,6 +30,9 @@ services:
       RepoOps__Worker__SupervisorDigestOutputPath: ${WORKER_SUPERVISOR_DIGEST_OUTPUT_PATH}
       RepoOps__Worker__SupervisorPromptOutputPath: ${WORKER_SUPERVISOR_PROMPT_OUTPUT_PATH}
       RepoOps__Worker__SupervisorPromptDigestOutputPath: ${WORKER_SUPERVISOR_PROMPT_DIGEST_OUTPUT_PATH}
+      RepoOps__Codex__Mode: ${CODEX_EXECUTOR_MODE}
+      RepoOps__Codex__OutputPath: ${CODEX_RESPONSE_OUTPUT_PATH}
+      RepoOps__Codex__DigestOutputPath: ${CODEX_RESPONSE_DIGEST_OUTPUT_PATH}
     volumes:
       - ./reports:/app/reports
       - ./config:/app/config:ro

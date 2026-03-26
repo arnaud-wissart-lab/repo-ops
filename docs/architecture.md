@@ -24,6 +24,8 @@
    - digest superviseur texte
    - prompts superviseur JSON
    - digest prompts texte
+   - réponses superviseur structurées JSON
+   - digest des réponses superviseur texte
 5. `n8n` consomme le JSON renvoyé directement par le worker.
 6. `n8n` envoie l’email à partir du digest déjà produit.
 
@@ -110,6 +112,31 @@ Templates de prompts actuellement disponibles :
 - validation finale pour `AutoMergeEligible` ;
 - variante prioritaire sécurité pour une action `FixRequired` liée à une vulnérabilité.
 
+### Exécuteur contrôlé des prompts
+
+L’exécuteur contrôlé se branche après le générateur de prompts et reste strictement passif.
+
+Il :
+
+- consomme un JSON de prompts déjà générés ;
+- passe par l’interface `ICodexClient` ;
+- utilise un client `Stub` par défaut ;
+- produit un JSON distinct de réponses structurées ;
+- génère un digest texte lisible ;
+- n’exécute aucune action sur les dépôts et ne déclenche aucun commit.
+
+Chaque réponse structurée contient au minimum :
+
+- le prompt initial ;
+- la réponse structurée ;
+- un résumé ;
+- un type de réponse (`Analysis`, `ProposedFix`, `Refactor`) ;
+- un niveau de confiance ;
+- `requiresHumanValidation` ;
+- `readyForExecution`.
+
+Dans l’état actuel, `requiresHumanValidation` reste toujours à `true` et `readyForExecution` reste à `false`.
+
 ### Aspire AppHost
 
 [`src/RepoOps.AppHost`](../src/RepoOps.AppHost) apporte une couche de pilotage local pour Visual Studio et le tableau de bord Aspire.
@@ -194,6 +221,7 @@ docker compose --profile maintenance run --rm renovate --version
 - exécuter éventuellement le merge GitHub réel dans un mode explicitement activé ;
 - superviser l’exécution explicite de `Renovate` et en conserver un artefact exploitable ;
 - fournir les artefacts consommés par `n8n`.
+- fournir des artefacts superviseur supplémentaires pour la relecture humaine, sans automatisation d’exécution.
 
 ## Règles d’auto-merge retenues
 
@@ -244,6 +272,8 @@ Chaque override peut :
 - l’API HTTP du worker reste locale au réseau Docker et ne porte pas encore de mécanisme d’authentification dédié ;
 - le superviseur actuel repose uniquement sur des règles codées en dur et n’utilise encore ni planification multi-étapes ni agents d’implémentation ;
 - le générateur de prompts repose lui aussi sur des templates codés en dur et devra être enrichi progressivement ;
+- l’exécuteur contrôlé repose actuellement sur un client `Stub` déterministe et n’appelle aucun service externe réel ;
+- les réponses générées ne doivent pas être interprétées comme des ordres d’exécution ; elles restent des propositions à valider manuellement ;
 - l'intégration GitHub n'exploite pas encore les issues, les dépendances de sécurité ni l'historique détaillé d'exécution de Renovate ;
 - le flux quotidien n8n ne relance pas `Renovate` automatiquement ; il exploite le dernier résultat connu.
 
@@ -259,6 +289,7 @@ flowchart LR
     Worker --> Reports["Réponse JSON + TXT + HTML"]
     Worker --> Supervisor["Décisions superviseur JSON + digest texte"]
     Worker --> Prompts["Prompts superviseur JSON + digest texte"]
+    Worker --> CodexResponses["Réponses superviseur structurées JSON + digest texte"]
     Worker -. exécution explicite .-> Renovate
     Worker --> RenovateArtifact["Artefact renovate-execution.json"]
     N8N --> Reports

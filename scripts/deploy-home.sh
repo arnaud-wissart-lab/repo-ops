@@ -1,0 +1,232 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+log() {
+  printf '[deploy-home] %s\n' "$1"
+}
+
+require_env() {
+  local var_name="$1"
+  if [ -z "${!var_name:-}" ]; then
+    printf '[deploy-home] Variable requise absente: %s\n' "$var_name" >&2
+    exit 1
+  fi
+}
+
+DEBUG_ENABLED=0
+debug() {
+  if [ "$DEBUG_ENABLED" -eq 1 ]; then
+    printf '[deploy-home][debug] %s\n' "$1"
+  fi
+}
+
+: "${SSH_PORT:=22}"
+: "${DEPLOY_REF:=main}"
+: "${DEPLOY_ENVIRONMENT:=home}"
+: "${DEPLOY_DEBUG:=0}"
+: "${GITHUB_TOKEN:=}"
+
+require_env "SSH_HOST"
+require_env "SSH_USER"
+require_env "SSH_PRIVATE_KEY"
+require_env "GITHUB_REPOSITORY"
+
+case "$DEPLOY_DEBUG" in
+  1 | true)
+    DEBUG_ENABLED=1
+    ;;
+  0 | false)
+    DEBUG_ENABLED=0
+    ;;
+  *)
+    log "Valeur DEPLOY_DEBUG invalide: '${DEPLOY_DEBUG}' (attendu: 0, 1, true, false)."
+    exit 1
+    ;;
+esac
+
+REPO_SLUG="${GITHUB_REPOSITORY}"
+REPO_TOKEN="${GITHUB_TOKEN}"
+
+if [ "$DEPLOY_ENVIRONMENT" != "home" ]; then
+  log "Environnement '${DEPLOY_ENVIRONMENT}' non reconnu pour ce script (attendu: home)."
+  exit 1
+fi
+
+log "Déploiement de ${REPO_SLUG}@${DEPLOY_REF} vers ${SSH_USER}@${SSH_HOST}:${SSH_PORT}."
+debug "Mode debug activé."
+
+ssh_key_file="$(mktemp)"
+cleanup() {
+  rm -f "$ssh_key_file"
+}
+trap cleanup EXIT
+
+umask 077
+printf '%s\n' "$SSH_PRIVATE_KEY" >"$ssh_key_file"
+chmod 600 "$ssh_key_file"
+
+ssh_opts=(
+  -i "$ssh_key_file"
+  -p "$SSH_PORT"
+  -o BatchMode=yes
+  -o StrictHostKeyChecking=accept-new
+  -o ConnectTimeout=10
+)
+
+ssh "${ssh_opts[@]}" "${SSH_USER}@${SSH_HOST}" \
+  bash -se -- "$DEPLOY_REF" "$REPO_SLUG" "$REPO_TOKEN" "$DEBUG_ENABLED" <<'REMOTE_SCRIPT'
+set -euo pipefail
+
+log() {
+  printf '[remote] %s\n' "$1"
+}
+
+DEPLOY_DEBUG_MODE="${4:-0}"
+debug() {
+  if [ "$DEPLOY_DEBUG_MODE" -eq 1 ]; then
+    printf '[remote][debug] %s\n' "$1"
+  fi
+}
+
+require_cmd() {
+  local cmd="$1"
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    log "Commande requise introuvable sur la machine cible: ${cmd}"
+    exit 1
+  fi
+}
+
+git_with_auth() {
+  if [ -n "$REPO_TOKEN" ]; then
+    local auth_header
+    auth_header="$(printf 'x-access-token:%s' "$REPO_TOKEN" | base64 | tr -d '\n')"
+    git -c "http.extraheader=AUTHORIZATION: basic ${auth_header}" "$@"
+    return
+  fi
+
+  git "$@"
+}
+
+DEPLOY_REF="$1"
+REPO_SLUG="$2"
+REPO_TOKEN="${3:-}"
+REPO_URL="https://github.com/${REPO_SLUG}.git"
+
+APP_DIR="/home/arnaud/apps/repo-ops"
+COMPOSE_FILE="docker-compose.yml"
+ENV_FILE=".env"
+ENV_EXAMPLE_FILE=".env.example"
+COMPOSE_PROJECT="repo-ops-home"
+HEALTHCHECK_URL="https://repoops.arnaudwissart.fr"
+HEALTHCHECK_TIMEOUT_SECONDS=300
+HEALTHCHECK_POLL_SECONDS=5
+EXPECTED_SERVICES=("worker" "postgres" "n8n")
+
+APP_PARENT_DIR="$(dirname "$APP_DIR")"
+COMPOSE_FILE_PATH="${APP_DIR}/${COMPOSE_FILE}"
+ENV_FILE_PATH="${APP_DIR}/${ENV_FILE}"
+ENV_EXAMPLE_PATH="${APP_DIR}/${ENV_EXAMPLE_FILE}"
+
+require_cmd git
+require_cmd docker
+require_cmd curl
+
+compose_cmd=()
+if docker compose version >/dev/null 2>&1; then
+  compose_cmd=(docker compose)
+elif command -v docker-compose >/dev/null 2>&1; then
+  compose_cmd=(docker-compose)
+else
+  log "docker compose est introuvable (ni plugin Docker, ni binaire docker-compose)."
+  exit 1
+fi
+
+log "Préparation du dossier ${APP_DIR}"
+mkdir -p "$APP_PARENT_DIR"
+
+if [ ! -d "$APP_DIR/.git" ]; then
+  log "Repository absent, clonage initial."
+  if ! git_with_auth clone "$REPO_URL" "$APP_DIR"; then
+    log "Clonage impossible. Si le dépôt est privé, vérifier que GITHUB_TOKEN est transmis."
+    exit 1
+  fi
+fi
+
+cd "$APP_DIR"
+git remote set-url origin "$REPO_URL"
+
+log "Mise à jour Git et résolution de la référence ${DEPLOY_REF}"
+git_with_auth fetch --prune --tags origin
+
+if [[ "$DEPLOY_REF" =~ ^[0-9a-f]{7,40}$ ]]; then
+  log "Référence détectée comme SHA, checkout détaché."
+  git checkout --detach "$DEPLOY_REF"
+elif git rev-parse -q --verify "refs/tags/${DEPLOY_REF}" >/dev/null; then
+  log "Référence détectée comme tag, checkout détaché."
+  git checkout --detach "refs/tags/${DEPLOY_REF}"
+else
+  log "Référence détectée comme branche, alignement sur origin/${DEPLOY_REF}."
+  git checkout -B "$DEPLOY_REF" "origin/${DEPLOY_REF}"
+  git reset --hard "origin/${DEPLOY_REF}"
+fi
+
+deployed_commit="$(git rev-parse --short HEAD)"
+deployed_date_utc="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+deployed_host="$(hostname -f 2>/dev/null || hostname 2>/dev/null || echo "unknown-host")"
+log "Commit déployé: ${deployed_commit}"
+log "Contexte déploiement: host=${deployed_host}, date_utc=${deployed_date_utc}, ref=${DEPLOY_REF}"
+
+if [ ! -f "$COMPOSE_FILE_PATH" ]; then
+  log "Fichier compose introuvable: ${COMPOSE_FILE_PATH}"
+  exit 1
+fi
+
+if [ ! -f "$ENV_EXAMPLE_PATH" ]; then
+  log "Fichier exemple introuvable: ${ENV_EXAMPLE_PATH}"
+  exit 1
+fi
+
+if [ ! -f "$ENV_FILE_PATH" ]; then
+  cp "$ENV_EXAMPLE_PATH" "$ENV_FILE_PATH"
+  chmod 600 "$ENV_FILE_PATH"
+  log "Fichier .env créé depuis .env.example. Personnaliser les secrets avant un déploiement réel."
+fi
+
+log "Validation de la configuration Compose"
+"${compose_cmd[@]}" --env-file "$ENV_FILE_PATH" -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE_PATH" config >/dev/null
+
+log "Build et démarrage de la stack home via docker compose"
+"${compose_cmd[@]}" --env-file "$ENV_FILE_PATH" -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE_PATH" up -d --build --remove-orphans
+
+log "Vérification de l'état compose"
+"${compose_cmd[@]}" --env-file "$ENV_FILE_PATH" -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE_PATH" ps
+
+health_attempts=$((HEALTHCHECK_TIMEOUT_SECONDS / HEALTHCHECK_POLL_SECONDS))
+if [ "$health_attempts" -lt 1 ]; then
+  health_attempts=1
+fi
+
+healthy="false"
+for ((attempt=1; attempt<=health_attempts; attempt+=1)); do
+  http_status="$(curl -sS -o /dev/null -I -L -w '%{http_code}' --connect-timeout 3 --max-time 10 "$HEALTHCHECK_URL" || true)"
+
+  if [ "$http_status" = "200" ] || [ "$http_status" = "301" ] || [ "$http_status" = "302" ]; then
+    healthy="true"
+    log "Healthcheck public OK via ${HEALTHCHECK_URL} (tentative ${attempt}/${health_attempts}, code=${http_status})."
+    break
+  fi
+
+  log "Healthcheck public indisponible (tentative ${attempt}/${health_attempts}, code=${http_status:-n/a})."
+  sleep "$HEALTHCHECK_POLL_SECONDS"
+done
+
+if [ "$healthy" != "true" ]; then
+  log "Le healthcheck public a échoué via ${HEALTHCHECK_URL}."
+  "${compose_cmd[@]}" --env-file "$ENV_FILE_PATH" -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE_PATH" logs --tail 120 "${EXPECTED_SERVICES[@]}" || true
+  exit 1
+fi
+
+log "Déploiement terminé avec succès."
+REMOTE_SCRIPT
+
+log "Script terminé."

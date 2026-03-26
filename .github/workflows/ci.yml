@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  build-test-worker:
+    name: Build et tests .NET
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore RepoOps.sln
+
+      - name: Vérifier le format whitespace
+        run: dotnet format whitespace RepoOps.sln --verify-no-changes --no-restore
+
+      - name: Build
+        run: dotnet build RepoOps.sln --configuration Release --no-restore
+
+      - name: Tests
+        run: dotnet test RepoOps.sln --configuration Release
+
+  build-demo-ui:
+    name: Build de la démo frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: demo-ui/package-lock.json
+
+      - name: Installer les dépendances frontend
+        working-directory: demo-ui
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: demo-ui
+        run: npm run build
+
+  verify-compose:
+    name: Vérifier Docker Compose
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Valider la configuration Compose
+        run: docker compose --env-file .env.example config

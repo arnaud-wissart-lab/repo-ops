@@ -94,7 +94,7 @@ Le dépôt inclut aussi une interface web de démonstration en `React + Vite + T
 Cette UI permet de :
 
 - lancer un run sec ;
-- déclencher un déploiement local explicite sur la machine hôte configurée ;
+- déclencher un déploiement local explicite sur la machine hôte configurée, à titre de démonstration locale ;
 - afficher un pipeline visuel du système ;
 - afficher le résumé global ;
 - visualiser les décisions du superviseur ;
@@ -111,7 +111,7 @@ Elle reste volontairement en mode démonstration :
 
 Elle peut aussi charger un scénario mock réaliste lorsque l’API locale n’est pas disponible.
 Le bouton de déploiement local appelle le worker, qui exécute une commande configurable sur la machine où il tourne.
-Pour `repo-ops`, la cible retenue est ce dépôt lui-même sur la machine personnelle, avec une vérification publique sur `https://repoops.arnaudwissart.fr`.
+Ce bouton reste un outil de démonstration locale. Le flux principal de déploiement retenu pour `repo-ops` est désormais le workflow GitHub Actions manuel décrit dans [`docs/RUNBOOK.md`](./docs/RUNBOOK.md).
 
 ### Scripts transitoires
 
@@ -661,8 +661,38 @@ npm run dev
 ```
 
 Le bouton `Déployer en local` appelle `POST /deployment/run`.
-Il est surtout prévu quand le worker est lancé sur l’hôte via `dotnet run`, afin d’exécuter un déploiement local explicite du socle sur la même machine.
-Le répertoire effectivement visé est la racine locale de ce dépôt, et la vérification finale cible `https://repoops.arnaudwissart.fr`.
+Il reste utile pour illustrer un déploiement local explicite quand le worker est lancé sur l’hôte via `dotnet run`.
+Le flux principal de déploiement reste toutefois le bouton GitHub Actions `Déploiement Manuel`, qui cible la machine personnelle via SSH et déploie le dépôt dans `/home/arnaud/apps/repo-ops`.
+
+## CI et déploiement manuel via GitHub Actions
+
+Le dépôt reprend désormais le même schéma d’exploitation que `BikeVoyager`, `ProbabilitesLotoEuroMillions` et `Tetrigular` :
+
+- une CI GitHub Actions sur `push` et `pull_request` ;
+- un workflow `Déploiement Manuel` déclenché via `workflow_dispatch` ;
+- un script [`scripts/deploy-home.sh`](./scripts/deploy-home.sh) exécuté depuis le workflow ;
+- un déploiement sur la machine personnelle via SSH ;
+- un contrôle final sur `https://repoops.arnaudwissart.fr`.
+
+Workflows ajoutés :
+
+- [`.github/workflows/ci.yml`](./.github/workflows/ci.yml)
+- [`.github/workflows/deploy-manual.yml`](./.github/workflows/deploy-manual.yml)
+
+Secrets GitHub attendus :
+
+- `SSH_HOST`
+- `SSH_USER`
+- `SSH_PRIVATE_KEY`
+- `SSH_PORT`
+
+Runner attendu :
+
+- `[self-hosted, linux, ci]`
+
+Détails d’exploitation :
+
+- [`docs/RUNBOOK.md`](./docs/RUNBOOK.md)
 
 ## Limites actuelles
 

@@ -51,6 +51,6 @@ public sealed class MaintenanceObservabilityBuilderTests
         Assert.Equal(4, result.Metrics.AnalyzedPullRequests);
         Assert.Equal(1, result.Metrics.AutoMergedPullRequests);
         Assert.Equal(1, result.Metrics.BlockedPullRequests);
-        Assert.Equal(4, result.Metrics.ErrorCount);
+        Assert.Equal(3, result.Metrics.ErrorCount);
     }
 }

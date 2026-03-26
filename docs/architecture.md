@@ -56,13 +56,21 @@ Une interface web légère en `React + Vite + TypeScript` complète désormais l
 Elle :
 
 - appelle les endpoints HTTP existants du worker ;
-- peut déclencher un déploiement local explicite sur la machine hôte configurée ;
-  pour `repo-ops`, ce déploiement vise la racine locale du dépôt et contrôle ensuite `https://repoops.arnaudwissart.fr` ;
+- peut déclencher un déploiement local explicite sur la machine hôte configurée, pour la démonstration ;
 - peut fonctionner en mode API ou en mode mock ;
 - reste en mode démonstration ;
 - n’exécute aucune opération Git ;
 - expose un pipeline visuel, des KPI, des décisions, des prompts, des logs et le JSON brut ;
-- ne remplace ni `n8n`, ni les flux CLI avancés.
+- ne remplace ni `n8n`, ni les flux CLI avancés ;
+- ne remplace pas le flux principal de déploiement GitHub Actions.
+
+Le flux principal de déploiement retenu pour `repo-ops` suit maintenant le même modèle que vos autres dépôts personnels :
+
+- CI GitHub Actions ;
+- workflow manuel `Déploiement Manuel` ;
+- script SSH [`scripts/deploy-home.sh`](../scripts/deploy-home.sh) ;
+- cible `/home/arnaud/apps/repo-ops` ;
+- vérification finale via `https://repoops.arnaudwissart.fr`.
 
 ### Worker .NET
 
@@ -397,6 +405,7 @@ Chaque override peut :
 - l’UI de démonstration est un client local pour présentation et tests manuels ; elle ne constitue pas un portail d’administration complet et son mode mock reste statique ;
 - l’intégration GitHub n'exploite pas encore les issues, les dépendances de sécurité ni l'historique détaillé d'exécution de Renovate ;
 - le bouton de déploiement local n’a de sens que si le worker tourne sur la machine cible ; exécuté dans un conteneur, il ne déploie que l’environnement du conteneur ;
+- le flux de déploiement réellement retenu passe donc par GitHub Actions et `scripts/deploy-home.sh`, pas par l’UI de démonstration ;
 - le flux quotidien n8n ne relance pas `Renovate` automatiquement ; il exploite le dernier résultat connu.
 
 ## Diagramme

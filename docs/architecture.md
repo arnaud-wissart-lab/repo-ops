@@ -22,6 +22,8 @@
    - HTML
    - décisions superviseur JSON
    - digest superviseur texte
+   - prompts superviseur JSON
+   - digest prompts texte
 5. `n8n` consomme le JSON renvoyé directement par le worker.
 6. `n8n` envoie l’email à partir du digest déjà produit.
 
@@ -88,6 +90,25 @@ Le premier lot de règles retenu est volontairement sobre :
 - vulnérabilité critique : priorité haute
 
 Cette couche ne déclenche encore ni merge, ni PR, ni agent externe. Elle prépare seulement le terrain pour un superviseur plus riche dans les lots suivants.
+
+### Générateur de prompts
+
+Le générateur de prompts se branche directement sur les actions du superviseur.
+
+Il :
+
+- transforme chaque action en prompt structuré ;
+- applique un template adapté au type d’action ;
+- produit un artefact JSON facilement copiable ;
+- produit un digest texte lisible ;
+- reste strictement passif : aucun appel Codex, aucune exécution automatique.
+
+Templates de prompts actuellement disponibles :
+
+- correction ciblée pour `FixRequired` ;
+- analyse pour `Review` ;
+- validation finale pour `AutoMergeEligible` ;
+- variante prioritaire sécurité pour une action `FixRequired` liée à une vulnérabilité.
 
 ### Aspire AppHost
 
@@ -222,6 +243,7 @@ Chaque override peut :
 - les overrides par dépôt ne prennent pas encore en charge des motifs globaux ou des groupes de dépôts ;
 - l’API HTTP du worker reste locale au réseau Docker et ne porte pas encore de mécanisme d’authentification dédié ;
 - le superviseur actuel repose uniquement sur des règles codées en dur et n’utilise encore ni planification multi-étapes ni agents d’implémentation ;
+- le générateur de prompts repose lui aussi sur des templates codés en dur et devra être enrichi progressivement ;
 - l'intégration GitHub n'exploite pas encore les issues, les dépendances de sécurité ni l'historique détaillé d'exécution de Renovate ;
 - le flux quotidien n8n ne relance pas `Renovate` automatiquement ; il exploite le dernier résultat connu.
 
@@ -236,6 +258,7 @@ flowchart LR
     N8N --> Worker
     Worker --> Reports["Réponse JSON + TXT + HTML"]
     Worker --> Supervisor["Décisions superviseur JSON + digest texte"]
+    Worker --> Prompts["Prompts superviseur JSON + digest texte"]
     Worker -. exécution explicite .-> Renovate
     Worker --> RenovateArtifact["Artefact renovate-execution.json"]
     N8N --> Reports

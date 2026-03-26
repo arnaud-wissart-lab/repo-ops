@@ -6,6 +6,7 @@ using RepoOps.Worker.Services;
 
 var runOnceRequested = args.Any(arg => string.Equals(arg, "--run-once", StringComparison.OrdinalIgnoreCase));
 var decideRequested = args.Any(arg => string.Equals(arg, "--decide", StringComparison.OrdinalIgnoreCase));
+var generatePromptsRequested = args.Any(arg => string.Equals(arg, "--generate-prompts", StringComparison.OrdinalIgnoreCase));
 var builder = WebApplication.CreateBuilder(ParsePassthroughArguments(args));
 
 builder.Configuration.AddInMemoryCollection(ParseWorkerOverrides(args));
@@ -92,12 +93,17 @@ builder.Services.AddSingleton<SupervisorDecisionEngine>();
 builder.Services.AddSingleton<SupervisorDecisionDigestRenderer>();
 builder.Services.AddSingleton<SupervisorDecisionPersistenceService>();
 builder.Services.AddSingleton<SupervisorDecisionWorkflowService>();
+builder.Services.AddSingleton<PromptGeneratorService>();
+builder.Services.AddSingleton<PromptDigestRenderer>();
+builder.Services.AddSingleton<PromptPersistenceService>();
+builder.Services.AddSingleton<PromptGenerationWorkflowService>();
 
 var app = builder.Build();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.MapPost("/maintenance/run", RunMaintenanceHttpAsync);
 app.MapPost("/supervisor/decisions", RunSupervisorHttpAsync);
+app.MapPost("/supervisor/prompts", RunPromptGenerationHttpAsync);
 
 if (runOnceRequested)
 {
@@ -144,6 +150,41 @@ if (decideRequested)
     catch (Exception exception)
     {
         app.Logger.LogError(exception, "Le moteur de décisions CLI a échoué");
+        Environment.ExitCode = 1;
+        return;
+    }
+}
+
+if (generatePromptsRequested)
+{
+    var emitJsonToStdout = app.Configuration.GetValue<bool>($"{RepoOpsWorkerOptions.SectionName}:EmitJsonToStdout");
+    var decisionsPath = app.Configuration[$"{RepoOpsWorkerOptions.SectionName}:SupervisorInputDecisionPath"];
+    var reportPath = app.Configuration[$"{RepoOpsWorkerOptions.SectionName}:SupervisorInputReportPath"];
+
+    try
+    {
+        if (!string.IsNullOrWhiteSpace(decisionsPath))
+        {
+            await RunPromptGenerationFromDecisionPathAsync(
+                app.Services,
+                decisionsPath,
+                emitJsonToStdout,
+                CancellationToken.None);
+        }
+        else
+        {
+            await RunPromptGenerationFromReportPathAsync(
+                app.Services,
+                string.IsNullOrWhiteSpace(reportPath) ? app.Configuration[$"{RepoOpsWorkerOptions.SectionName}:ReportOutputPath"] : reportPath,
+                emitJsonToStdout,
+                CancellationToken.None);
+        }
+
+        return;
+    }
+    catch (Exception exception)
+    {
+        app.Logger.LogError(exception, "Le générateur de prompts CLI a échoué");
         Environment.ExitCode = 1;
         return;
     }
@@ -229,6 +270,33 @@ static async Task<Results<JsonHttpResult<SupervisorDecisionResult>, ProblemHttpR
     }
 }
 
+static async Task<Results<JsonHttpResult<GeneratedPromptResult>, ProblemHttpResult>> RunPromptGenerationHttpAsync(
+    SupervisorDecisionResult decisions,
+    IServiceProvider services,
+    ILogger<Program> logger,
+    CancellationToken cancellationToken)
+{
+    try
+    {
+        var result = await RunPromptGenerationAsync(
+            services,
+            decisions,
+            emitJsonToStdout: false,
+            cancellationToken);
+
+        return TypedResults.Json(result, statusCode: StatusCodes.Status200OK);
+    }
+    catch (Exception exception)
+    {
+        logger.LogError(exception, "Le générateur de prompts HTTP a échoué");
+
+        return TypedResults.Problem(
+            title: "Erreur interne",
+            detail: "Le générateur de prompts n'a pas pu produire les prompts demandés.",
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+}
+
 static async Task<MaintenanceRunReport> RunMaintenanceAsync(
     IServiceProvider services,
     MaintenanceRunRequest request,
@@ -263,6 +331,42 @@ static async Task<SupervisorDecisionResult> RunSupervisorFromReportPathAsync(
     var workflowService = scope.ServiceProvider.GetRequiredService<SupervisorDecisionWorkflowService>();
 
     return await workflowService.RunFromReportPathAsync(reportPath, emitJsonToStdout, cancellationToken);
+}
+
+static async Task<GeneratedPromptResult> RunPromptGenerationAsync(
+    IServiceProvider services,
+    SupervisorDecisionResult decisions,
+    bool emitJsonToStdout,
+    CancellationToken cancellationToken)
+{
+    await using var scope = services.CreateAsyncScope();
+    var workflowService = scope.ServiceProvider.GetRequiredService<PromptGenerationWorkflowService>();
+
+    return await workflowService.RunAsync(decisions, emitJsonToStdout, cancellationToken);
+}
+
+static async Task<GeneratedPromptResult> RunPromptGenerationFromDecisionPathAsync(
+    IServiceProvider services,
+    string? decisionsPath,
+    bool emitJsonToStdout,
+    CancellationToken cancellationToken)
+{
+    await using var scope = services.CreateAsyncScope();
+    var workflowService = scope.ServiceProvider.GetRequiredService<PromptGenerationWorkflowService>();
+
+    return await workflowService.RunFromDecisionPathAsync(decisionsPath, emitJsonToStdout, cancellationToken);
+}
+
+static async Task<GeneratedPromptResult> RunPromptGenerationFromReportPathAsync(
+    IServiceProvider services,
+    string? reportPath,
+    bool emitJsonToStdout,
+    CancellationToken cancellationToken)
+{
+    await using var scope = services.CreateAsyncScope();
+    var workflowService = scope.ServiceProvider.GetRequiredService<PromptGenerationWorkflowService>();
+
+    return await workflowService.RunFromReportPathAsync(reportPath ?? string.Empty, emitJsonToStdout, cancellationToken);
 }
 
 static MaintenanceRunRequest ResolveCliRequest(IConfiguration configuration)
@@ -314,13 +418,15 @@ static void AddOptionalAutoMergePolicyFile(ConfigurationManager configuration)
 static string[] ParsePassthroughArguments(IEnumerable<string> args) =>
     args.Where(arg => !arg.StartsWith("--run-once", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--decide", StringComparison.OrdinalIgnoreCase)
+        && !arg.StartsWith("--generate-prompts", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--run-renovate", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--enable-auto-merge", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--disable-auto-merge-dry-run", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--automerge-policy-file=", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--emit-json-to-stdout", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--input-source=", StringComparison.OrdinalIgnoreCase)
-        && !arg.StartsWith("--report-path=", StringComparison.OrdinalIgnoreCase))
+        && !arg.StartsWith("--report-path=", StringComparison.OrdinalIgnoreCase)
+        && !arg.StartsWith("--decisions-path=", StringComparison.OrdinalIgnoreCase))
         .ToArray();
 
 static Dictionary<string, string?> ParseWorkerOverrides(IEnumerable<string> args)
@@ -335,6 +441,11 @@ static Dictionary<string, string?> ParseWorkerOverrides(IEnumerable<string> args
         }
 
         if (string.Equals(arg, "--decide", StringComparison.OrdinalIgnoreCase))
+        {
+            continue;
+        }
+
+        if (string.Equals(arg, "--generate-prompts", StringComparison.OrdinalIgnoreCase))
         {
             continue;
         }
@@ -402,6 +513,13 @@ static Dictionary<string, string?> ParseWorkerOverrides(IEnumerable<string> args
         if (arg.StartsWith(reportPathPrefix, StringComparison.OrdinalIgnoreCase))
         {
             overrides["RepoOps:Worker:SupervisorInputReportPath"] = arg[reportPathPrefix.Length..];
+            continue;
+        }
+
+        const string decisionsPathPrefix = "--decisions-path=";
+        if (arg.StartsWith(decisionsPathPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            overrides["RepoOps:Worker:SupervisorInputDecisionPath"] = arg[decisionsPathPrefix.Length..];
             continue;
         }
     }

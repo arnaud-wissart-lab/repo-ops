@@ -31,7 +31,15 @@ public sealed record SupervisorAction
 
     public string PullRequestUrl { get; init; } = string.Empty;
 
+    public PullRequestChecksStatus ChecksStatus { get; init; } = PullRequestChecksStatus.Unknown;
+
     public SupervisorActionPriority Priority { get; init; } = SupervisorActionPriority.Low;
 
     public string Reason { get; init; } = string.Empty;
+
+    public string Recommendation { get; init; } = string.Empty;
+
+    public bool IsSecurityRelated { get; init; }
+
+    public string SecuritySeverity { get; init; } = string.Empty;
 }

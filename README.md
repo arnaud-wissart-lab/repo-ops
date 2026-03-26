@@ -46,6 +46,7 @@ Par défaut, il démarre :
 Dans ce lot, le worker devient la source de vérité du reporting et interroge réellement GitHub pour une première collecte ciblée.
 Il calcule également des décisions d’auto-merge contrôlé sur les PR Renovate ouvertes et collecte une première vue des vulnérabilités via les `Dependabot alerts`.
 Il embarque désormais une première couche de superviseur IA fondée sur des règles simples, qui transforme le rapport en décisions structurées sans exécuter ces décisions.
+Il sait également transformer ces décisions en prompts structurés prêts à être utilisés manuellement dans Codex.
 
 ### Aspire AppHost
 
@@ -85,6 +86,8 @@ Le dossier `scripts/` reste présent pour la transition, mais il ne fait plus pa
    - [`worker-summary.html`](./reports/worker-summary.html)
    - [`supervisor-decisions.json`](./reports/supervisor-decisions.json)
    - [`supervisor-decisions.txt`](./reports/supervisor-decisions.txt)
+   - [`supervisor-prompts.json`](./reports/supervisor-prompts.json)
+   - [`supervisor-prompts.txt`](./reports/supervisor-prompts.txt)
    - [`renovate-execution.json`](./reports/renovate-execution.json) lorsqu'une exécution explicite de `Renovate` est lancée via le worker
    Le worker interroge GitHub avec `GITHUB_TOKEN` pour récupérer les PR Renovate ouvertes, les PR Renovate fusionnées récemment, les fermetures sans fusion récentes, les checks utiles à la qualification opérationnelle, les `Dependabot alerts` ouvertes et corrigées quand elles sont disponibles, ainsi que les informations nécessaires à une décision d’auto-merge contrôlé.
 5. `n8n` lit le JSON renvoyé directement par l’API du worker.
@@ -125,6 +128,58 @@ Mode HTTP :
 ```powershell
 Invoke-WebRequest -Uri "http://127.0.0.1:8080/supervisor/decisions" -Method Post -ContentType "application/json" -InFile ".\reports\worker-summary.json" | Select-Object -ExpandProperty Content
 ```
+
+## Prompt Generator
+
+Le `Prompt Generator` consomme les actions du `Decision Engine` et produit des prompts prêts à être utilisés manuellement avec Codex.
+
+Chaque prompt inclut :
+
+- un contexte clair ;
+- un objectif ;
+- des contraintes ;
+- une sortie attendue ;
+- un résumé du problème ;
+- l’état des checks ;
+- une recommandation.
+
+Templates actuellement gérés :
+
+- `fix-required` : prompt de correction
+- `review` : prompt d’analyse
+- `auto-merge-eligible` : prompt de validation finale
+- `vulnerability-priority` : prompt prioritaire lié à la sécurité
+
+Mode CLI à partir d’un rapport :
+
+```powershell
+dotnet run --project .\src\RepoOps.Worker -- --generate-prompts --report-path=reports/worker-summary.json --emit-json-to-stdout
+```
+
+Mode CLI à partir des décisions déjà générées :
+
+```powershell
+dotnet run --project .\src\RepoOps.Worker -- --generate-prompts --decisions-path=reports/supervisor-decisions.json --emit-json-to-stdout
+```
+
+Mode HTTP à partir des décisions :
+
+```powershell
+Invoke-WebRequest -Uri "http://127.0.0.1:8080/supervisor/prompts" -Method Post -ContentType "application/json" -InFile ".\reports\supervisor-decisions.json" | Select-Object -ExpandProperty Content
+```
+
+Note pratique :
+
+- sous `docker compose`, les artefacts sont écrits dans `.\reports\` ;
+- avec `dotnet run --project .\src\RepoOps.Worker`, les chemins par défaut aboutissent sous `.\src\RepoOps.Worker\reports\` tant qu’ils ne sont pas surchargés.
+
+Usage avec Codex :
+
+- générer les prompts ;
+- relire la priorité et le contexte ;
+- choisir explicitement le prompt à utiliser ;
+- coller ce prompt dans Codex pour obtenir une analyse, une revue ou une proposition de correction ;
+- garder la décision humaine sur l’exécution réelle.
 
 ## Auto-merge contrôlé
 
@@ -292,9 +347,10 @@ Cette couche Aspire sert au pilotage local. Pour les exécutions réelles de la 
 - la qualification du run `Renovate` repose encore sur des heuristiques de logs `stdout` et `stderr` ;
 - le worker expose désormais une API locale simple, mais sans authentification dédiée à ce stade car elle reste confinée au réseau Docker interne ;
 - le superviseur IA actuel est uniquement un moteur de décisions à règles fixes ; il n’orchestre encore aucun agent ni aucune exécution de tâche ;
+- le générateur de prompts prépare des prompts prêts à l’emploi, mais ne contacte jamais Codex et ne déclenche aucune exécution ;
 - la configuration SMTP et les destinataires restent à finaliser manuellement dans `n8n` ;
 - le workflow quotidien exploite le dernier résultat connu de `Renovate`, mais ne le relance pas automatiquement ;
-- la sortie du superviseur est distincte du rapport principal et n’est pas encore consommée par `n8n`.
+- les sorties du superviseur et des prompts restent distinctes du rapport principal et ne sont pas encore consommées par `n8n`.
 
 ## Vérifications locales
 
@@ -312,8 +368,10 @@ dotnet build .\RepoOps.sln
 Invoke-WebRequest -Uri "http://127.0.0.1:8080/health" | Select-Object -ExpandProperty Content
 Invoke-WebRequest -Uri "http://127.0.0.1:8080/maintenance/run" -Method Post -ContentType "application/json" -Body '{"inputSource":"validation-http","triggerRenovateExecution":false}' | Select-Object -ExpandProperty Content
 Invoke-WebRequest -Uri "http://127.0.0.1:8080/supervisor/decisions" -Method Post -ContentType "application/json" -InFile ".\reports\worker-summary.json" | Select-Object -ExpandProperty Content
+Invoke-WebRequest -Uri "http://127.0.0.1:8080/supervisor/prompts" -Method Post -ContentType "application/json" -InFile ".\src\RepoOps.Worker\reports\supervisor-decisions.json" | Select-Object -ExpandProperty Content
 dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --run-once --emit-json-to-stdout --input-source=validation-cli
 dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --decide --report-path=reports/worker-summary.json --emit-json-to-stdout
+dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --generate-prompts --decisions-path=reports/supervisor-decisions.json --emit-json-to-stdout
 dotnet run --project .\src\RepoOps.Worker -- --run-once --run-renovate --emit-json-to-stdout --input-source=validation-renovate
 $env:AUTOMERGE_ENABLED="true"
 $env:AUTOMERGE_DRY_RUN_ENABLED="true"
@@ -468,5 +526,22 @@ Exemple de sortie du superviseur :
       "reason": "La mise à jour patch est prête, avec checks verts et décision d'auto-merge positive. La PR est corrélée à une vulnérabilité critique et doit être priorisée."
     }
   ]
+}
+```
+
+Exemple de prompt généré :
+
+```json
+{
+  "promptType": "fix-required",
+  "repository": "owner/repo-a",
+  "pullRequestNumber": 101,
+  "priority": "High",
+  "context": {
+    "problemSummary": "Les checks GitHub sont en échec ou la décision d'auto-merge a échoué.",
+    "checksStatus": "en échec",
+    "recommendation": "Traiter la cause d'échec ou le sujet de sécurité avant toute autre action."
+  },
+  "promptText": "Contexte\n- Dépôt cible : owner/repo-a\n- Cible précise : owner/repo-a#101\n..."
 }
 ```

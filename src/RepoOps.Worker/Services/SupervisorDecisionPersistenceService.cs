@@ -27,6 +27,28 @@ public sealed class SupervisorDecisionPersistenceService(IOptions<RepoOpsWorkerO
             cancellationToken);
     }
 
+    public async Task<SupervisorDecisionResult> LoadAsync(string decisionPath, CancellationToken cancellationToken)
+    {
+        var fullPath = Path.GetFullPath(decisionPath);
+
+        if (!File.Exists(fullPath))
+        {
+            throw new FileNotFoundException(
+                $"Le fichier de décisions '{fullPath}' est introuvable.",
+                fullPath);
+        }
+
+        var json = await File.ReadAllTextAsync(fullPath, cancellationToken);
+        var result = JsonSerializer.Deserialize<SupervisorDecisionResult>(json, JsonOptions);
+
+        if (result is null)
+        {
+            throw new InvalidOperationException($"Le fichier de décisions '{fullPath}' est invalide ou vide.");
+        }
+
+        return result;
+    }
+
     public string Serialize(SupervisorDecisionResult result) => JsonSerializer.Serialize(result, JsonOptions);
 
     private static async Task WriteFileAsync(

@@ -23,4 +23,12 @@ public sealed class RepoOpsWorkerOptions
     public string SupervisorOutputPath { get; set; } = "reports/supervisor-decisions.json";
 
     public string SupervisorDigestOutputPath { get; set; } = "reports/supervisor-decisions.txt";
+
+    public string SupervisorPromptOutputPath { get; set; } = "reports/supervisor-prompts.json";
+
+    public string SupervisorPromptDigestOutputPath { get; set; } = "reports/supervisor-prompts.txt";
+
+    public string? SupervisorInputReportPath { get; set; }
+
+    public string? SupervisorInputDecisionPath { get; set; }
 }

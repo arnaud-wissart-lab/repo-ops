@@ -29,7 +29,10 @@ public sealed class SupervisorDecisionEngine(ILogger<SupervisorDecisionEngine> l
                 Type = SupervisorActionType.FixRequired,
                 Repository = repository.Repository,
                 Priority = SupervisorActionPriority.High,
-                Reason = $"Le dépôt présente {repository.CriticalCount} vulnérabilité(s) critique(s) ouverte(s) sans PR corrective prioritaire identifiée."
+                Reason = $"Le dépôt présente {repository.CriticalCount} vulnérabilité(s) critique(s) ouverte(s) sans PR corrective prioritaire identifiée.",
+                Recommendation = "Ouvrir une analyse prioritaire du dépôt et identifier la correction ou la mitigation la plus sûre.",
+                IsSecurityRelated = true,
+                SecuritySeverity = "critical"
             });
         }
 
@@ -117,8 +120,12 @@ public sealed class SupervisorDecisionEngine(ILogger<SupervisorDecisionEngine> l
             PullRequestNumber = evaluation.Number,
             PullRequestTitle = evaluation.Title,
             PullRequestUrl = evaluation.HtmlUrl,
+            ChecksStatus = evaluation.ChecksStatus,
             Priority = priority,
-            Reason = string.Join(" ", reasons.Where(reason => !string.IsNullOrWhiteSpace(reason)))
+            Reason = string.Join(" ", reasons.Where(reason => !string.IsNullOrWhiteSpace(reason))),
+            Recommendation = ResolveRecommendation(actionType, evaluation),
+            IsSecurityRelated = evaluation.IsSecurityUpdate,
+            SecuritySeverity = evaluation.SecuritySeverity
         };
     }
 
@@ -140,6 +147,25 @@ public sealed class SupervisorDecisionEngine(ILogger<SupervisorDecisionEngine> l
         }
 
         return "Aucune action immédiate n'est retenue pour cette PR dans cette première version.";
+    }
+
+    private static string ResolveRecommendation(
+        SupervisorActionType actionType,
+        PullRequestMergeEvaluation evaluation)
+    {
+        return actionType switch
+        {
+            SupervisorActionType.AutoMergeEligible =>
+                "Effectuer une validation finale ciblée puis confirmer si la PR peut être fusionnée en sécurité.",
+            SupervisorActionType.Review when evaluation.VersionType == PullRequestVersionType.Major =>
+                "Prioriser une revue technique approfondie avant toute décision de fusion.",
+            SupervisorActionType.Review =>
+                "Analyser l'impact fonctionnel et la compatibilité de la PR avant de statuer.",
+            SupervisorActionType.FixRequired =>
+                "Traiter la cause d'échec ou le sujet de sécurité avant toute autre action.",
+            _ =>
+                "Conserver la PR en observation jusqu'à évolution de son état."
+        };
     }
 
     private static IReadOnlyList<string> BuildNotes(

@@ -9,6 +9,7 @@ public sealed class SupervisorDecisionWorkflowService(
     SupervisorDecisionEngine decisionEngine,
     SupervisorDecisionDigestRenderer digestRenderer,
     SupervisorDecisionPersistenceService persistenceService,
+    PromptGenerationWorkflowService promptGenerationWorkflowService,
     MaintenanceReportPersistenceService reportPersistenceService,
     IOptions<RepoOpsWorkerOptions> options)
 {
@@ -29,6 +30,7 @@ public sealed class SupervisorDecisionWorkflowService(
         };
 
         await persistenceService.PersistAsync(result, cancellationToken);
+        await promptGenerationWorkflowService.RunAsync(result, emitJsonToStdout: false, cancellationToken);
 
         if (emitJsonToStdout)
         {

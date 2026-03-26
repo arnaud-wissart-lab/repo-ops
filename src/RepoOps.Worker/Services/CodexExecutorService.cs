@@ -20,8 +20,10 @@ public sealed class CodexExecutorService(
             cancellationToken.ThrowIfCancellationRequested();
 
             var clientResponse = await codexClient.ExecuteAsync(prompt, cancellationToken);
+            var actionId = BuildActionId(prompt);
             responses.Add(new CodexExecutionResponse
             {
+                ActionId = actionId,
                 ActionType = prompt.ActionType,
                 Repository = prompt.Repository,
                 PullRequestNumber = prompt.PullRequestNumber,
@@ -64,6 +66,19 @@ public sealed class CodexExecutorService(
             Responses = responses,
             Notes = BuildNotes(prompts, responses, codexClient.Mode)
         };
+    }
+
+    private static string BuildActionId(GeneratedPrompt prompt)
+    {
+        var repository = string.IsNullOrWhiteSpace(prompt.Repository)
+            ? "unknown-repository"
+            : prompt.Repository.Replace('/', '-').ToLowerInvariant();
+        var pullRequestPart = prompt.PullRequestNumber?.ToString() ?? "repo";
+        var promptType = string.IsNullOrWhiteSpace(prompt.PromptType)
+            ? "unknown"
+            : prompt.PromptType.ToLowerInvariant();
+
+        return $"{repository}-{pullRequestPart}-{promptType}";
     }
 
     private static IReadOnlyList<string> BuildNotes(

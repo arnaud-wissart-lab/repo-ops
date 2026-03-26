@@ -33,6 +33,11 @@ services:
       RepoOps__Codex__Mode: ${CODEX_EXECUTOR_MODE}
       RepoOps__Codex__OutputPath: ${CODEX_RESPONSE_OUTPUT_PATH}
       RepoOps__Codex__DigestOutputPath: ${CODEX_RESPONSE_DIGEST_OUTPUT_PATH}
+      RepoOps__Validation__OutputPath: ${VALIDATION_OUTPUT_PATH}
+      RepoOps__Validation__DigestOutputPath: ${VALIDATION_DIGEST_OUTPUT_PATH}
+      RepoOps__Validation__InputResponsePath: ${VALIDATION_INPUT_RESPONSE_PATH}
+      RepoOps__Validation__InputValidationPath: ${VALIDATION_INPUT_FILE_PATH}
+      RepoOps__Validation__InteractiveMode: ${VALIDATION_INTERACTIVE_MODE}
     volumes:
       - ./reports:/app/reports
       - ./config:/app/config:ro

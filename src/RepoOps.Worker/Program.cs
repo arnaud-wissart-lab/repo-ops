@@ -8,6 +8,7 @@ var runOnceRequested = args.Any(arg => string.Equals(arg, "--run-once", StringCo
 var decideRequested = args.Any(arg => string.Equals(arg, "--decide", StringComparison.OrdinalIgnoreCase));
 var generatePromptsRequested = args.Any(arg => string.Equals(arg, "--generate-prompts", StringComparison.OrdinalIgnoreCase));
 var executePromptsRequested = args.Any(arg => string.Equals(arg, "--execute-prompts", StringComparison.OrdinalIgnoreCase));
+var validateResponsesRequested = args.Any(arg => string.Equals(arg, "--validate-responses", StringComparison.OrdinalIgnoreCase));
 var builder = WebApplication.CreateBuilder(ParsePassthroughArguments(args));
 
 builder.Configuration.AddInMemoryCollection(ParseWorkerOverrides(args));
@@ -88,6 +89,20 @@ builder.Services.AddOptions<CodexExecutorOptions>()
         options.OutputPath = configuration["CODEX_RESPONSE_OUTPUT_PATH"] ?? options.OutputPath;
         options.DigestOutputPath = configuration["CODEX_RESPONSE_DIGEST_OUTPUT_PATH"] ?? options.DigestOutputPath;
     });
+builder.Services.AddOptions<ValidationEngineOptions>()
+    .Configure<IConfiguration>((options, configuration) =>
+    {
+        configuration.GetSection(ValidationEngineOptions.SectionName).Bind(options);
+        options.OutputPath = configuration["VALIDATION_OUTPUT_PATH"] ?? options.OutputPath;
+        options.DigestOutputPath = configuration["VALIDATION_DIGEST_OUTPUT_PATH"] ?? options.DigestOutputPath;
+        options.InputResponsePath = configuration["VALIDATION_INPUT_RESPONSE_PATH"] ?? options.InputResponsePath;
+        options.InputValidationPath = configuration["VALIDATION_INPUT_FILE_PATH"] ?? options.InputValidationPath;
+
+        if (bool.TryParse(configuration["VALIDATION_INTERACTIVE_MODE"], out var interactiveMode))
+        {
+            options.InteractiveMode = interactiveMode;
+        }
+    });
 builder.Services.AddHttpClient<GitHubApiClient>();
 builder.Services.AddSingleton<ICodexClient>(serviceProvider =>
 {
@@ -124,6 +139,10 @@ builder.Services.AddSingleton<CodexExecutorService>();
 builder.Services.AddSingleton<CodexExecutionDigestRenderer>();
 builder.Services.AddSingleton<CodexExecutionPersistenceService>();
 builder.Services.AddSingleton<CodexExecutionWorkflowService>();
+builder.Services.AddSingleton<ValidationEngineService>();
+builder.Services.AddSingleton<ValidationDigestRenderer>();
+builder.Services.AddSingleton<ValidationPersistenceService>();
+builder.Services.AddSingleton<ValidationWorkflowService>();
 
 var app = builder.Build();
 
@@ -235,6 +254,32 @@ if (executePromptsRequested)
     catch (Exception exception)
     {
         app.Logger.LogError(exception, "L'exécuteur contrôlé CLI a échoué");
+        Environment.ExitCode = 1;
+        return;
+    }
+}
+
+if (validateResponsesRequested)
+{
+    var emitJsonToStdout = app.Configuration.GetValue<bool>($"{RepoOpsWorkerOptions.SectionName}:EmitJsonToStdout");
+    var responsePath = app.Configuration[$"{ValidationEngineOptions.SectionName}:InputResponsePath"];
+    var validationPath = app.Configuration[$"{ValidationEngineOptions.SectionName}:InputValidationPath"];
+    var interactiveMode = app.Configuration.GetValue<bool>($"{ValidationEngineOptions.SectionName}:InteractiveMode");
+
+    try
+    {
+        await RunValidationFromPathsAsync(
+            app.Services,
+            responsePath,
+            validationPath,
+            interactiveMode,
+            emitJsonToStdout,
+            CancellationToken.None);
+        return;
+    }
+    catch (Exception exception)
+    {
+        app.Logger.LogError(exception, "Le moteur de validation CLI a échoué");
         Environment.ExitCode = 1;
         return;
     }
@@ -470,6 +515,25 @@ static async Task<CodexExecutionResult> RunCodexExecutionFromPromptPathAsync(
     return await workflowService.RunFromPromptPathAsync(promptsPath, emitJsonToStdout, cancellationToken);
 }
 
+static async Task<ValidationResult> RunValidationFromPathsAsync(
+    IServiceProvider services,
+    string? responsePath,
+    string? validationPath,
+    bool interactiveMode,
+    bool emitJsonToStdout,
+    CancellationToken cancellationToken)
+{
+    await using var scope = services.CreateAsyncScope();
+    var workflowService = scope.ServiceProvider.GetRequiredService<ValidationWorkflowService>();
+
+    return await workflowService.RunFromPathsAsync(
+        responsePath,
+        validationPath,
+        interactiveMode,
+        emitJsonToStdout,
+        cancellationToken);
+}
+
 static MaintenanceRunRequest ResolveCliRequest(IConfiguration configuration)
 {
     return new MaintenanceRunRequest
@@ -521,6 +585,7 @@ static string[] ParsePassthroughArguments(IEnumerable<string> args) =>
         && !arg.StartsWith("--decide", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--generate-prompts", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--execute-prompts", StringComparison.OrdinalIgnoreCase)
+        && !arg.StartsWith("--validate-responses", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--run-renovate", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--enable-auto-merge", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--disable-auto-merge-dry-run", StringComparison.OrdinalIgnoreCase)
@@ -529,7 +594,11 @@ static string[] ParsePassthroughArguments(IEnumerable<string> args) =>
         && !arg.StartsWith("--input-source=", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--report-path=", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--decisions-path=", StringComparison.OrdinalIgnoreCase)
-        && !arg.StartsWith("--prompts-path=", StringComparison.OrdinalIgnoreCase))
+        && !arg.StartsWith("--prompts-path=", StringComparison.OrdinalIgnoreCase)
+        && !arg.StartsWith("--responses-path=", StringComparison.OrdinalIgnoreCase)
+        && !arg.StartsWith("--validation-input-path=", StringComparison.OrdinalIgnoreCase)
+        && !arg.StartsWith("--interactive", StringComparison.OrdinalIgnoreCase)
+        && !arg.StartsWith("--interactive=", StringComparison.OrdinalIgnoreCase))
         .ToArray();
 
 static Dictionary<string, string?> ParseWorkerOverrides(IEnumerable<string> args)
@@ -554,6 +623,11 @@ static Dictionary<string, string?> ParseWorkerOverrides(IEnumerable<string> args
         }
 
         if (string.Equals(arg, "--execute-prompts", StringComparison.OrdinalIgnoreCase))
+        {
+            continue;
+        }
+
+        if (string.Equals(arg, "--validate-responses", StringComparison.OrdinalIgnoreCase))
         {
             continue;
         }
@@ -635,6 +709,33 @@ static Dictionary<string, string?> ParseWorkerOverrides(IEnumerable<string> args
         if (arg.StartsWith(promptsPathPrefix, StringComparison.OrdinalIgnoreCase))
         {
             overrides["RepoOps:Codex:InputPromptPath"] = arg[promptsPathPrefix.Length..];
+            continue;
+        }
+
+        const string responsesPathPrefix = "--responses-path=";
+        if (arg.StartsWith(responsesPathPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            overrides["RepoOps:Validation:InputResponsePath"] = arg[responsesPathPrefix.Length..];
+            continue;
+        }
+
+        const string validationInputPathPrefix = "--validation-input-path=";
+        if (arg.StartsWith(validationInputPathPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            overrides["RepoOps:Validation:InputValidationPath"] = arg[validationInputPathPrefix.Length..];
+            continue;
+        }
+
+        if (string.Equals(arg, "--interactive", StringComparison.OrdinalIgnoreCase))
+        {
+            overrides["RepoOps:Validation:InteractiveMode"] = "true";
+            continue;
+        }
+
+        const string interactivePrefix = "--interactive=";
+        if (arg.StartsWith(interactivePrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            overrides["RepoOps:Validation:InteractiveMode"] = arg[interactivePrefix.Length..];
             continue;
         }
     }

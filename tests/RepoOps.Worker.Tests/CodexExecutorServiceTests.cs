@@ -31,6 +31,7 @@ public sealed class CodexExecutorServiceTests
         }), CancellationToken.None);
 
         var response = Assert.Single(result.Responses);
+        Assert.Equal("owner-repo-a-120-review", response.ActionId);
         Assert.Equal(CodexResponseType.Analysis, response.ResponseType);
         Assert.True(response.RequiresHumanValidation);
         Assert.False(response.ReadyForExecution);

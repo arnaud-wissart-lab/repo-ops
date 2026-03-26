@@ -54,6 +54,8 @@ public sealed class CodexExecutionSummary
 
 public sealed class CodexExecutionResponse
 {
+    public string ActionId { get; init; } = string.Empty;
+
     public SupervisorActionType ActionType { get; init; } = SupervisorActionType.Ignore;
 
     public string Repository { get; init; } = string.Empty;

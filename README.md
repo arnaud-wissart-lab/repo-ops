@@ -90,6 +90,8 @@ Le dossier `scripts/` reste présent pour la transition, mais il ne fait plus pa
    - [`supervisor-prompts.txt`](./reports/supervisor-prompts.txt)
    - [`supervisor-codex-responses.json`](./reports/supervisor-codex-responses.json)
    - [`supervisor-codex-responses.txt`](./reports/supervisor-codex-responses.txt)
+   - [`supervisor-validations.json`](./reports/supervisor-validations.json)
+   - [`supervisor-validations.txt`](./reports/supervisor-validations.txt)
    - [`renovate-execution.json`](./reports/renovate-execution.json) lorsqu'une exécution explicite de `Renovate` est lancée via le worker
    Le worker interroge GitHub avec `GITHUB_TOKEN` pour récupérer les PR Renovate ouvertes, les PR Renovate fusionnées récemment, les fermetures sans fusion récentes, les checks utiles à la qualification opérationnelle, les `Dependabot alerts` ouvertes et corrigées quand elles sont disponibles, ainsi que les informations nécessaires à une décision d’auto-merge contrôlé.
 5. `n8n` lit le JSON renvoyé directement par l’API du worker.
@@ -231,6 +233,7 @@ Exemple de réponse structurée :
   },
   "responses": [
     {
+      "actionId": "owner-repo-a-42-review",
       "repository": "owner/repo-a",
       "pullRequestNumber": 42,
       "promptType": "review",
@@ -238,6 +241,72 @@ Exemple de réponse structurée :
       "confidenceLevel": "Medium",
       "requiresHumanValidation": true,
       "readyForExecution": false
+    }
+  ]
+}
+```
+
+## Validation Engine
+
+Le `Validation Engine` ajoute une couche de contrôle humain explicite entre les réponses structurées issues de l’exécuteur contrôlé et une éventuelle exécution future.
+
+Principes retenus :
+
+- aucune action n’est exécutée dans ce lot ;
+- une validation produit uniquement une décision humaine structurée ;
+- une action approuvée passe à `readyForExecution=true` sans effet automatique ;
+- le flux reste strictement manuel et auditable.
+
+Décisions possibles :
+
+- `Approved`
+- `Rejected`
+- `NeedsReview`
+
+Sorties produites :
+
+- [`supervisor-validations.json`](./reports/supervisor-validations.json)
+- [`supervisor-validations.txt`](./reports/supervisor-validations.txt)
+
+Mode CLI interactif :
+
+```powershell
+dotnet run --project .\src\RepoOps.Worker -- --validate-responses --responses-path=reports/supervisor-codex-responses.json --interactive=true --emit-json-to-stdout
+```
+
+Mode CLI non interactif à partir d’un fichier de validation :
+
+```powershell
+dotnet run --project .\src\RepoOps.Worker -- --validate-responses --responses-path=reports/supervisor-codex-responses.json --validation-input-path=reports/supervisor-validations.json --emit-json-to-stdout
+```
+
+Workflow humain retenu :
+
+1. produire le rapport ;
+2. produire les décisions superviseur ;
+3. produire les prompts ;
+4. produire les réponses structurées du client Codex simulé ;
+5. relire ces réponses ;
+6. approuver, rejeter ou marquer à revoir ;
+7. préparer un futur `readyForExecution` sans exécution effective.
+
+Exemple de validation structurée :
+
+```json
+{
+  "summary": {
+    "totalActions": 1,
+    "approvedActions": 1,
+    "rejectedActions": 0,
+    "needsReviewActions": 0,
+    "readyForExecutionActions": 1
+  },
+  "decisions": [
+    {
+      "actionId": "owner-repo-a-42-review",
+      "decision": "Approved",
+      "comment": "Validation humaine explicite après relecture.",
+      "readyForExecution": true
     }
   ]
 }
@@ -412,6 +481,7 @@ Cette couche Aspire sert au pilotage local. Pour les exécutions réelles de la 
 - le générateur de prompts prépare des prompts prêts à l’emploi, mais ne contacte jamais Codex et ne déclenche aucune exécution ;
 - l’exécuteur contrôlé produit aujourd’hui des réponses simulées et structurées via un client `Stub`, sans appeler réellement Codex ;
 - aucune réponse générée n’est exécutable directement ; une validation humaine reste obligatoire avant toute utilisation ;
+- le moteur de validation humaine prépare un état `readyForExecution`, mais aucune exécution automatique n’existe encore dans le dépôt ;
 - la configuration SMTP et les destinataires restent à finaliser manuellement dans `n8n` ;
 - le workflow quotidien exploite le dernier résultat connu de `Renovate`, mais ne le relance pas automatiquement ;
 - les sorties du superviseur et des prompts restent distinctes du rapport principal et ne sont pas encore consommées par `n8n`.
@@ -438,6 +508,7 @@ dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --run-once --em
 dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --decide --report-path=reports/worker-summary.json --emit-json-to-stdout
 dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --generate-prompts --decisions-path=reports/supervisor-decisions.json --emit-json-to-stdout
 dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --execute-prompts --prompts-path=reports/supervisor-prompts.json --emit-json-to-stdout
+dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --validate-responses --responses-path=reports/supervisor-codex-responses.json --validation-input-path=reports/supervisor-validations.json --emit-json-to-stdout
 dotnet run --project .\src\RepoOps.Worker -- --run-once --run-renovate --emit-json-to-stdout --input-source=validation-renovate
 $env:AUTOMERGE_ENABLED="true"
 $env:AUTOMERGE_DRY_RUN_ENABLED="true"
@@ -619,6 +690,7 @@ Exemple de réponse structurée issue de l’exécuteur contrôlé :
   "executorMode": "Stub",
   "responses": [
     {
+      "actionId": "owner-repo-a-101-fix-required",
       "repository": "owner/repo-a",
       "pullRequestNumber": 101,
       "responseType": "ProposedFix",
@@ -626,6 +698,27 @@ Exemple de réponse structurée issue de l’exécuteur contrôlé :
       "requiresHumanValidation": true,
       "readyForExecution": false,
       "summary": "Réponse simulée orientée correction, à relire avant toute modification manuelle."
+    }
+  ]
+}
+```
+
+Exemple de fichier de validation humaine :
+
+```json
+{
+  "decisions": [
+    {
+      "actionId": "owner-repo-a-101-fix-required",
+      "decision": "Approved",
+      "comment": "Accord humain après relecture du diagnostic.",
+      "timestampUtc": "2026-03-26T11:00:00Z"
+    },
+    {
+      "actionId": "owner-repo-b-42-review",
+      "decision": "NeedsReview",
+      "comment": "Une revue fonctionnelle complémentaire reste nécessaire.",
+      "timestampUtc": "2026-03-26T11:05:00Z"
     }
   ]
 }

@@ -26,6 +26,8 @@
    - digest prompts texte
    - réponses superviseur structurées JSON
    - digest des réponses superviseur texte
+   - validations humaines JSON
+   - digest des validations humaines texte
 5. `n8n` consomme le JSON renvoyé directement par le worker.
 6. `n8n` envoie l’email à partir du digest déjà produit.
 
@@ -137,6 +139,28 @@ Chaque réponse structurée contient au minimum :
 
 Dans l’état actuel, `requiresHumanValidation` reste toujours à `true` et `readyForExecution` reste à `false`.
 
+### Validation Engine
+
+Le moteur de validation humaine se place après l’exécuteur contrôlé.
+
+Il :
+
+- consomme les réponses structurées déjà produites ;
+- accepte soit une saisie interactive en CLI, soit un fichier de validation existant ;
+- produit une décision humaine explicite par action ;
+- génère un JSON de validation et un digest texte ;
+- prépare un champ `readyForExecution` pour les étapes futures ;
+- n’exécute rien automatiquement.
+
+Les décisions possibles sont :
+
+- `Approved`
+- `Rejected`
+- `NeedsReview`
+
+Le mode interactif affiche chaque action, son résumé et son niveau de confiance, puis demande une décision et un commentaire libre.
+Le mode non interactif charge un fichier de validation contenant les mêmes décisions.
+
 ### Aspire AppHost
 
 [`src/RepoOps.AppHost`](../src/RepoOps.AppHost) apporte une couche de pilotage local pour Visual Studio et le tableau de bord Aspire.
@@ -222,6 +246,7 @@ docker compose --profile maintenance run --rm renovate --version
 - superviser l’exécution explicite de `Renovate` et en conserver un artefact exploitable ;
 - fournir les artefacts consommés par `n8n`.
 - fournir des artefacts superviseur supplémentaires pour la relecture humaine, sans automatisation d’exécution.
+- porter la chaîne de validation humaine avant toute exécution future contrôlée.
 
 ## Règles d’auto-merge retenues
 
@@ -274,6 +299,8 @@ Chaque override peut :
 - le générateur de prompts repose lui aussi sur des templates codés en dur et devra être enrichi progressivement ;
 - l’exécuteur contrôlé repose actuellement sur un client `Stub` déterministe et n’appelle aucun service externe réel ;
 - les réponses générées ne doivent pas être interprétées comme des ordres d’exécution ; elles restent des propositions à valider manuellement ;
+- la validation humaine reste locale au worker et n’est pas encore exposée dans `n8n` ;
+- `readyForExecution` est un état préparatoire uniquement ; aucun moteur d’exécution contrôlée n’est encore branché ;
 - l'intégration GitHub n'exploite pas encore les issues, les dépendances de sécurité ni l'historique détaillé d'exécution de Renovate ;
 - le flux quotidien n8n ne relance pas `Renovate` automatiquement ; il exploite le dernier résultat connu.
 
@@ -290,6 +317,7 @@ flowchart LR
     Worker --> Supervisor["Décisions superviseur JSON + digest texte"]
     Worker --> Prompts["Prompts superviseur JSON + digest texte"]
     Worker --> CodexResponses["Réponses superviseur structurées JSON + digest texte"]
+    Worker --> HumanValidation["Validations humaines JSON + digest texte"]
     Worker -. exécution explicite .-> Renovate
     Worker --> RenovateArtifact["Artefact renovate-execution.json"]
     N8N --> Reports

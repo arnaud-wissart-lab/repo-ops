@@ -248,6 +248,7 @@ if [ ! -f "$ENV_FILE_PATH" ]; then
 fi
 
 ensure_env_key "$ENV_FILE_PATH" "DEMO_UI_PORT" "8084"
+ensure_env_key "$ENV_FILE_PATH" "DEMO_UI_BIND_ADDRESS" "0.0.0.0"
 
 log "Validation de la configuration Compose"
 "${compose_cmd[@]}" --env-file "$ENV_FILE_PATH" -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE_PATH" config >/dev/null

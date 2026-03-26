@@ -114,6 +114,8 @@ Elle peut aussi charger un scénario mock réaliste lorsque l’API locale n’e
 Le bouton de déploiement local appelle le worker, qui exécute une commande configurable sur la machine où il tourne.
 Ce bouton reste un outil de démonstration locale. Le flux principal de déploiement retenu pour `repo-ops` est désormais le workflow GitHub Actions manuel décrit dans [`docs/RUNBOOK.md`](./docs/RUNBOOK.md).
 
+En déploiement `home`, la démo est publiée sur le port `8084`. Si un reverse proxy local comme Nginx Proxy Manager est utilisé, il doit cibler la machine hôte sur ce port, pas `127.0.0.1` depuis son propre conteneur.
+
 ### Scripts transitoires
 
 Le dossier `scripts/` reste présent pour la transition, mais il ne fait plus partie du flux réel retenu. Les scripts servent encore à des vérifications locales ou à un secours ponctuel, pas à la logique métier principale.

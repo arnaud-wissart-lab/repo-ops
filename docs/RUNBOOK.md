@@ -54,7 +54,7 @@ Le script de déploiement utilise :
 - fichier d’environnement : `.env`
 - fichier d’exemple : `.env.example`
 - projet compose : `repo-ops-home`
-- publication locale de la démo : `127.0.0.1:8084`
+- publication locale de la démo : `0.0.0.0:8084`
 - vérification locale post-déploiement : `http://127.0.0.1:8084`
 - vérification post-déploiement : `https://repoops.arnaudwissart.fr`
 - timeout du healthcheck : `300` secondes, polling toutes les `5` secondes
@@ -68,6 +68,31 @@ Si `.env` existe déjà mais ne contient pas `DEMO_UI_PORT` :
 
 - le script ajoute automatiquement `DEMO_UI_PORT=8084`
 - cela évite les publications Docker sur port aléatoire lors des mises à jour d’un ancien environnement
+
+Si `.env` existe déjà mais ne contient pas `DEMO_UI_BIND_ADDRESS` :
+
+- le script ajoute automatiquement `DEMO_UI_BIND_ADDRESS=0.0.0.0`
+- cela permet à un reverse proxy local exécuté dans un autre conteneur, comme Nginx Proxy Manager, d’atteindre la démo sur le port `8084`
+
+## Reverse proxy avec Nginx Proxy Manager
+
+`repoops.arnaudwissart.fr` est servi en façade par Nginx Proxy Manager, qui s’appuie sur `openresty`.
+
+Le fichier trouvé sous `/home/arnaud/docker/npm/data/nginx/proxy_host/*.conf` est généré par NPM :
+
+- ne pas le modifier à la main ;
+- effectuer la modification dans l’interface Nginx Proxy Manager.
+
+Paramètres attendus dans NPM pour `repoops.arnaudwissart.fr` :
+
+- Scheme : `http`
+- Forward Hostname / IP : IP ou nom de la machine hôte qui exécute `repo-ops`
+- Forward Port : `8084`
+
+Éviter `127.0.0.1` comme cible si NPM tourne lui-même en conteneur Docker :
+
+- dans ce cas, `127.0.0.1` pointe vers le conteneur NPM lui-même, pas vers la machine hôte ;
+- utiliser plutôt l’IP de la machine hôte visible depuis NPM.
 
 ## Démarrage manuel home hors workflow
 

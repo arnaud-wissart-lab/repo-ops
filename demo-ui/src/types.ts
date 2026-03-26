@@ -266,3 +266,19 @@ export interface DemoRunState {
   prompts: GeneratedPromptResult;
   codex: CodexExecutionResult;
 }
+
+export interface DeploymentExecutionResult {
+  status: string;
+  requestedBy: string;
+  targetName: string;
+  dryRunEnabled: boolean;
+  startedAtUtc?: string;
+  finishedAtUtc?: string;
+  durationSeconds?: number;
+  command: string;
+  workingDirectory: string;
+  exitCode?: number;
+  summary: string;
+  logs: string[];
+  errors: string[];
+}

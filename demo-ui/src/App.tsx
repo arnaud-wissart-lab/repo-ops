@@ -5,8 +5,10 @@ import {
   executeCodexPrompts,
   getConfiguredDemoMode,
   getMockDemoRunState,
+  runLocalDeployment,
   runMaintenanceReport,
 } from "./api";
+import { mockDeploymentExecutionResult } from "./mocks/demoData";
 import { DecisionSection } from "./components/DecisionSection";
 import { DemoModeBadge } from "./components/DemoModeBadge";
 import { DeveloperPanel } from "./components/DeveloperPanel";
@@ -22,6 +24,7 @@ import { StatusPill } from "./components/StatusPill";
 import type {
   DemoMode,
   DemoRunState,
+  DeploymentExecutionResult,
   DeveloperLogEntry,
   MaintenanceRunReport,
   PipelineStep,
@@ -134,6 +137,9 @@ export default function App() {
   const [logs, setLogs] = useState<DeveloperLogEntry[]>([]);
   const [pipelineStates, setPipelineStates] = useState(createInitialPipelineStates);
   const [activeMode, setActiveMode] = useState<DemoMode>(configuredMode);
+  const [deploymentStatus, setDeploymentStatus] = useState<UiStatus>("idle");
+  const [deploymentResult, setDeploymentResult] = useState<DeploymentExecutionResult | null>(null);
+  const [deploymentError, setDeploymentError] = useState("");
 
   function appendLog(entry: DeveloperLogEntry) {
     setLogs((current) => [...current, entry]);
@@ -311,6 +317,70 @@ export default function App() {
     }
   }
 
+  async function executeDeployment(mode: DemoMode) {
+    setDeploymentStatus("loading");
+    setDeploymentError("");
+    setDeploymentResult(null);
+
+    try {
+      let result: DeploymentExecutionResult;
+
+      if (mode === "mock") {
+        result = structuredClone(mockDeploymentExecutionResult);
+      } else if (mode === "auto") {
+        try {
+          result = await runLocalDeployment();
+        } catch (apiError) {
+          appendLog(
+            createLogEntry(
+              "WARN",
+              "deployment",
+              "API de déploiement indisponible, bascule automatique vers le scénario mock.",
+            ),
+          );
+          result = structuredClone(mockDeploymentExecutionResult);
+
+          if (apiError instanceof Error) {
+            setDeploymentError(
+              `L’API de déploiement locale n’a pas répondu. La démonstration a basculé sur un exemple mock. Détail : ${apiError.message}`,
+            );
+          }
+        }
+      } else {
+        result = await runLocalDeployment();
+      }
+
+      setDeploymentResult(result);
+      setDeploymentStatus(result.status.toLowerCase() === "failed" ? "error" : "success");
+      setLogs((current) => [
+        ...current,
+        ...createDerivedLogEntries("deployment", result.logs),
+        ...createDerivedLogEntries("deployment", result.errors),
+        createLogEntry(
+          result.status.toLowerCase() === "failed" ? "ERROR" : "INFO",
+          "deployment",
+          result.summary,
+        ),
+      ]);
+    } catch (caughtError) {
+      setDeploymentStatus("error");
+      setDeploymentError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Le déploiement local n’a pas pu être déclenché.",
+      );
+      appendLog(
+        createLogEntry(
+          "ERROR",
+          "deployment",
+          caughtError instanceof Error
+            ? caughtError.message
+            : "Erreur inconnue lors du déploiement local.",
+        ),
+      );
+    }
+  }
+
   const report = run?.report;
   const decisions = run?.decisions;
   const prompts = run?.prompts;
@@ -350,8 +420,10 @@ export default function App() {
         <HeroSection
           mode={activeMode}
           status={status}
+          deploymentStatus={deploymentStatus}
           onRun={() => executeScenario(configuredMode)}
           onLoadMock={() => executeScenario("mock")}
+          onDeploy={() => executeDeployment(configuredMode)}
         />
 
         <section className="top-strip">
@@ -388,6 +460,46 @@ export default function App() {
               <p className="subtle-text">
                 Lancez un scénario API ou chargez un exemple pour explorer le
                 cockpit.
+              </p>
+            )}
+          </div>
+
+          <div className="status-card">
+            <div>
+              <p className="section-kicker">Déploiement local</p>
+              <h2>Bouton de déploiement</h2>
+            </div>
+            <StatusPill
+              label={
+                deploymentStatus === "idle"
+                  ? "Non déclenché"
+                  : deploymentStatus === "loading"
+                    ? "Déploiement"
+                    : deploymentStatus === "success"
+                      ? deploymentResult?.dryRunEnabled
+                        ? "Dry-run exécuté"
+                        : "Déployé"
+                      : "Échec"
+              }
+              tone={statusTone(deploymentStatus)}
+            />
+            {deploymentResult ? (
+              <div className="run-context-inline">
+                <p className="subtle-text">{deploymentResult.summary}</p>
+                <p className="subtle-text">
+                  Cible : {deploymentResult.targetName} · durée{" "}
+                  {deploymentResult.durationSeconds?.toFixed(1) ?? "0.0"} s
+                </p>
+                <p className="run-scenario-text">
+                  Commande : {deploymentResult.command}
+                </p>
+              </div>
+            ) : deploymentError ? (
+              <p className="error-text">{deploymentError}</p>
+            ) : (
+              <p className="subtle-text">
+                Déclenche un déploiement local explicite sur la machine hôte
+                configurée pour ce dépôt.
               </p>
             )}
           </div>

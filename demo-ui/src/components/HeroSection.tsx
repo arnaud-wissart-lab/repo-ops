@@ -4,8 +4,10 @@ import { StatusPill } from "./StatusPill";
 interface HeroSectionProps {
   mode: DemoMode;
   status: UiStatus;
+  deploymentStatus: UiStatus;
   onRun: () => Promise<void>;
   onLoadMock: () => Promise<void>;
+  onDeploy: () => Promise<void>;
 }
 
 function modeLabel(mode: DemoMode): string {
@@ -23,10 +25,14 @@ function modeLabel(mode: DemoMode): string {
 export function HeroSection({
   mode,
   status,
+  deploymentStatus,
   onRun,
   onLoadMock,
+  onDeploy,
 }: HeroSectionProps) {
   const isLoading = status === "loading";
+  const isDeploying = deploymentStatus === "loading";
+  const isBusy = isLoading || isDeploying;
 
   return (
     <header className="hero-panel">
@@ -70,7 +76,7 @@ export function HeroSection({
             type="button"
             className={isLoading ? "primary-button is-loading" : "primary-button"}
             onClick={() => void onRun()}
-            disabled={isLoading}
+            disabled={isBusy}
           >
             <span className="primary-button-content">
               {isLoading ? <span className="button-spinner" aria-hidden="true" /> : null}
@@ -84,15 +90,25 @@ export function HeroSection({
             type="button"
             className="secondary-button"
             onClick={() => void onLoadMock()}
-            disabled={isLoading}
+            disabled={isBusy}
           >
             Charger un exemple
+          </button>
+          <button
+            type="button"
+            className={isDeploying ? "secondary-button is-loading" : "secondary-button"}
+            onClick={() => void onDeploy()}
+            disabled={isBusy}
+          >
+            {isDeploying ? "Déploiement en cours..." : "Déployer en local"}
           </button>
         </div>
         <p className="hero-feedback">
           {isLoading
             ? "Le pipeline se déroule étape par étape pour rendre l’exécution lisible."
-            : "Le déclenchement reste strictement en dry-run et ne lance aucune action irréversible."}
+            : isDeploying
+              ? "Le worker déclenche le déploiement local configuré pour cette machine."
+              : "Le déclenchement reste strictement en dry-run sur les actions sensibles et le déploiement vise la même machine locale."}
         </p>
       </aside>
     </header>

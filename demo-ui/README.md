@@ -12,6 +12,7 @@ Cette interface fournit une démonstration visuelle du pipeline `repo-ops` dans 
 - affichage d’une timeline verticale du run ;
 - affichage des décisions du superviseur ;
 - affichage des prompts générés ;
+- déclenchement d’un déploiement local explicite via le worker ;
 - affichage d’un panneau développeur avec logs et JSON brut ;
 - chargement d’un scénario mock réaliste si le backend n’est pas disponible.
 
@@ -22,6 +23,8 @@ La page n’exécute pas :
 - de création de pull request ;
 - de merge réel ;
 - de validation humaine.
+
+Le bouton de déploiement local vise la machine sur laquelle le worker tourne. Dans le mode par défaut, il reste en `dry-run` tant que la configuration backend n’est pas ouverte au réel.
 
 ## Structure frontend
 
@@ -69,6 +72,7 @@ http://127.0.0.1:5173
 En développement, Vite relaie automatiquement :
 
 - `/maintenance/*`
+- `/deployment/*`
 - `/supervisor/*`
 
 vers `http://127.0.0.1:8080`.

@@ -10,6 +10,7 @@ var generatePromptsRequested = args.Any(arg => string.Equals(arg, "--generate-pr
 var executePromptsRequested = args.Any(arg => string.Equals(arg, "--execute-prompts", StringComparison.OrdinalIgnoreCase));
 var validateResponsesRequested = args.Any(arg => string.Equals(arg, "--validate-responses", StringComparison.OrdinalIgnoreCase));
 var executeValidatedRequested = args.Any(arg => string.Equals(arg, "--execute-validated", StringComparison.OrdinalIgnoreCase));
+var runDeploymentRequested = args.Any(arg => string.Equals(arg, "--run-deployment", StringComparison.OrdinalIgnoreCase));
 var showRunsRequested = args.Any(arg => string.Equals(arg, "--show-runs", StringComparison.OrdinalIgnoreCase));
 var builder = WebApplication.CreateBuilder(ParsePassthroughArguments(args));
 
@@ -173,6 +174,33 @@ builder.Services.AddOptions<CommitEngineOptions>()
             options.PreCommitValidationTimeoutSeconds = validationTimeoutSeconds;
         }
     });
+builder.Services.AddOptions<DeploymentOptions>()
+    .Configure<IConfiguration>((options, configuration) =>
+    {
+        configuration.GetSection(DeploymentOptions.SectionName).Bind(options);
+
+        if (bool.TryParse(configuration["DEPLOYMENT_ENABLED"], out var enabled))
+        {
+            options.Enabled = enabled;
+        }
+
+        if (bool.TryParse(configuration["DEPLOYMENT_DRY_RUN_ENABLED"], out var dryRunEnabled))
+        {
+            options.DryRunEnabled = dryRunEnabled;
+        }
+
+        options.TargetName = configuration["DEPLOYMENT_TARGET_NAME"] ?? options.TargetName;
+        options.Command = configuration["DEPLOYMENT_COMMAND"] ?? options.Command;
+        options.Arguments = configuration["DEPLOYMENT_ARGUMENTS"] ?? options.Arguments;
+        options.DryRunArguments = configuration["DEPLOYMENT_DRY_RUN_ARGUMENTS"] ?? options.DryRunArguments;
+        options.WorkingDirectory = configuration["DEPLOYMENT_WORKING_DIRECTORY"] ?? options.WorkingDirectory;
+        options.OutputPath = configuration["DEPLOYMENT_OUTPUT_PATH"] ?? options.OutputPath;
+
+        if (int.TryParse(configuration["DEPLOYMENT_TIMEOUT_SECONDS"], out var timeoutSeconds))
+        {
+            options.TimeoutSeconds = timeoutSeconds;
+        }
+    });
 builder.Services.AddHttpClient<GitHubApiClient>();
 builder.Services.AddSingleton<ICodexClient>(serviceProvider =>
 {
@@ -226,11 +254,13 @@ builder.Services.AddSingleton<CommitEngineService>();
 builder.Services.AddSingleton<CommitDigestRenderer>();
 builder.Services.AddSingleton<CommitExecutionPersistenceService>();
 builder.Services.AddSingleton<CommitWorkflowService>();
+builder.Services.AddSingleton<DeploymentExecutionService>();
 
 var app = builder.Build();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.MapPost("/maintenance/run", RunMaintenanceHttpAsync);
+app.MapPost("/deployment/run", RunDeploymentHttpAsync);
 app.MapPost("/supervisor/decisions", RunSupervisorHttpAsync);
 app.MapPost("/supervisor/prompts", RunPromptGenerationHttpAsync);
 app.MapPost("/supervisor/codex/execute", RunCodexExecutionHttpAsync);
@@ -392,6 +422,30 @@ if (executeValidatedRequested)
     }
 }
 
+if (runDeploymentRequested)
+{
+    var emitJsonToStdout = app.Configuration.GetValue<bool>($"{RepoOpsWorkerOptions.SectionName}:EmitJsonToStdout");
+
+    try
+    {
+        await RunDeploymentAsync(
+            app.Services,
+            new DeploymentRunRequest
+            {
+                RequestedBy = "worker-cli"
+            },
+            emitJsonToStdout,
+            CancellationToken.None);
+        return;
+    }
+    catch (Exception exception)
+    {
+        app.Logger.LogError(exception, "Le déploiement local CLI a échoué");
+        Environment.ExitCode = 1;
+        return;
+    }
+}
+
 if (showRunsRequested)
 {
     var emitJsonToStdout = app.Configuration.GetValue<bool>($"{RepoOpsWorkerOptions.SectionName}:EmitJsonToStdout");
@@ -463,6 +517,33 @@ static async Task<Results<JsonHttpResult<MaintenanceRunReport>, ProblemHttpResul
         return TypedResults.Problem(
             title: "Erreur interne",
             detail: "Le worker n'a pas pu produire le rapport demandé.",
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+}
+
+static async Task<Results<JsonHttpResult<DeploymentExecutionResult>, ProblemHttpResult>> RunDeploymentHttpAsync(
+    DeploymentRunRequest? request,
+    IServiceProvider services,
+    ILogger<Program> logger,
+    CancellationToken cancellationToken)
+{
+    try
+    {
+        var result = await RunDeploymentAsync(
+            services,
+            request ?? new DeploymentRunRequest { RequestedBy = "http-api" },
+            emitJsonToStdout: false,
+            cancellationToken);
+
+        return TypedResults.Json(result, statusCode: StatusCodes.Status200OK);
+    }
+    catch (Exception exception)
+    {
+        logger.LogError(exception, "Le déploiement local HTTP a échoué");
+
+        return TypedResults.Problem(
+            title: "Erreur interne",
+            detail: "Le worker n'a pas pu exécuter le déploiement demandé.",
             statusCode: StatusCodes.Status500InternalServerError);
     }
 }
@@ -692,6 +773,29 @@ static async Task<RunHistoryViewResult> RunHistoryAsync(
     return await workflowService.RunAsync(requestedCount, emitJsonToStdout, cancellationToken);
 }
 
+static async Task<DeploymentExecutionResult> RunDeploymentAsync(
+    IServiceProvider services,
+    DeploymentRunRequest request,
+    bool emitJsonToStdout,
+    CancellationToken cancellationToken)
+{
+    await using var scope = services.CreateAsyncScope();
+    var deploymentService = scope.ServiceProvider.GetRequiredService<DeploymentExecutionService>();
+    var result = await deploymentService.ExecuteAsync(request, cancellationToken);
+
+    if (emitJsonToStdout)
+    {
+        Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(
+            result,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)
+            {
+                WriteIndented = true
+            }));
+    }
+
+    return result;
+}
+
 static MaintenanceRunRequest ResolveCliRequest(IConfiguration configuration)
 {
     return new MaintenanceRunRequest
@@ -745,6 +849,7 @@ static string[] ParsePassthroughArguments(IEnumerable<string> args) =>
         && !arg.StartsWith("--execute-prompts", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--validate-responses", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--execute-validated", StringComparison.OrdinalIgnoreCase)
+        && !arg.StartsWith("--run-deployment", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--run-renovate", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--enable-auto-merge", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--disable-auto-merge-dry-run", StringComparison.OrdinalIgnoreCase)
@@ -799,6 +904,11 @@ static Dictionary<string, string?> ParseWorkerOverrides(IEnumerable<string> args
         }
 
         if (string.Equals(arg, "--execute-validated", StringComparison.OrdinalIgnoreCase))
+        {
+            continue;
+        }
+
+        if (string.Equals(arg, "--run-deployment", StringComparison.OrdinalIgnoreCase))
         {
             continue;
         }

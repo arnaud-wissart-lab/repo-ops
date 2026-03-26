@@ -1,5 +1,6 @@
 import { mockDemoRunState } from "./mocks/demoData";
 import type {
+  DeploymentExecutionResult,
   CodexExecutionResult,
   DemoMode,
   DemoRunState,
@@ -121,4 +122,10 @@ export async function executeCodexPrompts(
     "/supervisor/codex/execute",
     prompts,
   );
+}
+
+export async function runLocalDeployment(): Promise<DeploymentExecutionResult> {
+  return postJson<{ requestedBy: string }, DeploymentExecutionResult>("/deployment/run", {
+    requestedBy: "demo-ui",
+  });
 }

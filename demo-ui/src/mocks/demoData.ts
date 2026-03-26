@@ -1,5 +1,6 @@
 import type {
   CodexExecutionResult,
+  DeploymentExecutionResult,
   DemoRunState,
   GeneratedPromptResult,
   MaintenanceRunReport,
@@ -441,4 +442,27 @@ export const mockDemoRunState: DemoRunState = {
   decisions,
   prompts,
   codex,
+};
+
+export const mockDeploymentExecutionResult: DeploymentExecutionResult = {
+  status: "DryRun",
+  requestedBy: "demo-ui-mock",
+  targetName: "Machine locale",
+  dryRunEnabled: true,
+  startedAtUtc: "2026-03-26T08:30:12.000Z",
+  finishedAtUtc: "2026-03-26T08:30:14.000Z",
+  durationSeconds: 2.1,
+  command: "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-local.ps1 -DryRun",
+  workingDirectory: "C:/Users/ArnaudW/source/repos/repo-ops",
+  exitCode: 0,
+  summary:
+    "Le déploiement a été simulé avec succès pour la machine locale. La stack Docker Compose aurait été reconstruite puis relancée.",
+  logs: [
+    "[deploy] Cible : machine locale",
+    "[deploy] Répertoire : C:/Users/ArnaudW/source/repos/repo-ops",
+    "[deploy] Mode dry-run actif.",
+    "[deploy] Vérification attendue : docker compose config",
+    "[deploy] Action attendue : docker compose up -d --build",
+  ],
+  errors: [],
 };

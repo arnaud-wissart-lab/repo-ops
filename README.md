@@ -94,6 +94,7 @@ Le dépôt inclut aussi une interface web de démonstration en `React + Vite + T
 Cette UI permet de :
 
 - lancer un run sec ;
+- déclencher un déploiement local explicite sur la machine hôte configurée ;
 - afficher un pipeline visuel du système ;
 - afficher le résumé global ;
 - visualiser les décisions du superviseur ;
@@ -109,6 +110,7 @@ Elle reste volontairement en mode démonstration :
 - aucune action irréversible.
 
 Elle peut aussi charger un scénario mock réaliste lorsque l’API locale n’est pas disponible.
+Le bouton de déploiement local appelle le worker, qui exécute une commande configurable sur la machine où il tourne.
 
 ### Scripts transitoires
 
@@ -656,6 +658,9 @@ Mode mock forcé :
 $env:VITE_DEMO_MODE="mock"
 npm run dev
 ```
+
+Le bouton `Déployer en local` appelle `POST /deployment/run`.
+Il est surtout prévu quand le worker est lancé sur l’hôte via `dotnet run`, afin d’exécuter un déploiement local explicite du socle sur la même machine.
 
 ## Limites actuelles
 

@@ -26,6 +26,8 @@ services:
       RepoOps__Worker__ReportOutputPath: ${WORKER_REPORT_OUTPUT_PATH}
       RepoOps__Worker__SummaryTextOutputPath: ${WORKER_SUMMARY_TEXT_OUTPUT_PATH}
       RepoOps__Worker__SummaryHtmlOutputPath: ${WORKER_SUMMARY_HTML_OUTPUT_PATH}
+      RepoOps__Worker__SupervisorOutputPath: ${WORKER_SUPERVISOR_OUTPUT_PATH}
+      RepoOps__Worker__SupervisorDigestOutputPath: ${WORKER_SUPERVISOR_DIGEST_OUTPUT_PATH}
     volumes:
       - ./reports:/app/reports
       - ./config:/app/config:ro

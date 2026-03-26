@@ -5,6 +5,7 @@ using RepoOps.Worker.Options;
 using RepoOps.Worker.Services;
 
 var runOnceRequested = args.Any(arg => string.Equals(arg, "--run-once", StringComparison.OrdinalIgnoreCase));
+var decideRequested = args.Any(arg => string.Equals(arg, "--decide", StringComparison.OrdinalIgnoreCase));
 var builder = WebApplication.CreateBuilder(ParsePassthroughArguments(args));
 
 builder.Configuration.AddInMemoryCollection(ParseWorkerOverrides(args));
@@ -87,11 +88,16 @@ builder.Services.AddSingleton<MaintenanceReportBuilder>();
 builder.Services.AddSingleton<MaintenanceDigestRenderer>();
 builder.Services.AddSingleton<MaintenanceReportPersistenceService>();
 builder.Services.AddSingleton<MaintenanceWorkflowService>();
+builder.Services.AddSingleton<SupervisorDecisionEngine>();
+builder.Services.AddSingleton<SupervisorDecisionDigestRenderer>();
+builder.Services.AddSingleton<SupervisorDecisionPersistenceService>();
+builder.Services.AddSingleton<SupervisorDecisionWorkflowService>();
 
 var app = builder.Build();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.MapPost("/maintenance/run", RunMaintenanceHttpAsync);
+app.MapPost("/supervisor/decisions", RunSupervisorHttpAsync);
 
 if (runOnceRequested)
 {
@@ -116,6 +122,28 @@ if (runOnceRequested)
     catch (Exception exception)
     {
         app.Logger.LogError(exception, "Le cycle CLI a échoué");
+        Environment.ExitCode = 1;
+        return;
+    }
+}
+
+if (decideRequested)
+{
+    var emitJsonToStdout = app.Configuration.GetValue<bool>($"{RepoOpsWorkerOptions.SectionName}:EmitJsonToStdout");
+    var reportPath = app.Configuration[$"{RepoOpsWorkerOptions.SectionName}:SupervisorInputReportPath"];
+
+    try
+    {
+        await RunSupervisorFromReportPathAsync(
+            app.Services,
+            reportPath,
+            emitJsonToStdout,
+            CancellationToken.None);
+        return;
+    }
+    catch (Exception exception)
+    {
+        app.Logger.LogError(exception, "Le moteur de décisions CLI a échoué");
         Environment.ExitCode = 1;
         return;
     }
@@ -174,6 +202,33 @@ static async Task<Results<JsonHttpResult<MaintenanceRunReport>, ProblemHttpResul
     }
 }
 
+static async Task<Results<JsonHttpResult<SupervisorDecisionResult>, ProblemHttpResult>> RunSupervisorHttpAsync(
+    MaintenanceRunReport report,
+    IServiceProvider services,
+    ILogger<Program> logger,
+    CancellationToken cancellationToken)
+{
+    try
+    {
+        var result = await RunSupervisorAsync(
+            services,
+            report,
+            emitJsonToStdout: false,
+            cancellationToken);
+
+        return TypedResults.Json(result, statusCode: StatusCodes.Status200OK);
+    }
+    catch (Exception exception)
+    {
+        logger.LogError(exception, "Le moteur de décisions HTTP a échoué");
+
+        return TypedResults.Problem(
+            title: "Erreur interne",
+            detail: "Le superviseur n'a pas pu produire les décisions demandées.",
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+}
+
 static async Task<MaintenanceRunReport> RunMaintenanceAsync(
     IServiceProvider services,
     MaintenanceRunRequest request,
@@ -184,6 +239,30 @@ static async Task<MaintenanceRunReport> RunMaintenanceAsync(
     var workflowService = scope.ServiceProvider.GetRequiredService<MaintenanceWorkflowService>();
 
     return await workflowService.RunAsync(request, emitJsonToStdout, cancellationToken);
+}
+
+static async Task<SupervisorDecisionResult> RunSupervisorAsync(
+    IServiceProvider services,
+    MaintenanceRunReport report,
+    bool emitJsonToStdout,
+    CancellationToken cancellationToken)
+{
+    await using var scope = services.CreateAsyncScope();
+    var workflowService = scope.ServiceProvider.GetRequiredService<SupervisorDecisionWorkflowService>();
+
+    return await workflowService.RunAsync(report, emitJsonToStdout, cancellationToken);
+}
+
+static async Task<SupervisorDecisionResult> RunSupervisorFromReportPathAsync(
+    IServiceProvider services,
+    string? reportPath,
+    bool emitJsonToStdout,
+    CancellationToken cancellationToken)
+{
+    await using var scope = services.CreateAsyncScope();
+    var workflowService = scope.ServiceProvider.GetRequiredService<SupervisorDecisionWorkflowService>();
+
+    return await workflowService.RunFromReportPathAsync(reportPath, emitJsonToStdout, cancellationToken);
 }
 
 static MaintenanceRunRequest ResolveCliRequest(IConfiguration configuration)
@@ -234,12 +313,14 @@ static void AddOptionalAutoMergePolicyFile(ConfigurationManager configuration)
 
 static string[] ParsePassthroughArguments(IEnumerable<string> args) =>
     args.Where(arg => !arg.StartsWith("--run-once", StringComparison.OrdinalIgnoreCase)
+        && !arg.StartsWith("--decide", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--run-renovate", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--enable-auto-merge", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--disable-auto-merge-dry-run", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--automerge-policy-file=", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--emit-json-to-stdout", StringComparison.OrdinalIgnoreCase)
-        && !arg.StartsWith("--input-source=", StringComparison.OrdinalIgnoreCase))
+        && !arg.StartsWith("--input-source=", StringComparison.OrdinalIgnoreCase)
+        && !arg.StartsWith("--report-path=", StringComparison.OrdinalIgnoreCase))
         .ToArray();
 
 static Dictionary<string, string?> ParseWorkerOverrides(IEnumerable<string> args)
@@ -249,6 +330,11 @@ static Dictionary<string, string?> ParseWorkerOverrides(IEnumerable<string> args
     foreach (var arg in args)
     {
         if (string.Equals(arg, "--run-once", StringComparison.OrdinalIgnoreCase))
+        {
+            continue;
+        }
+
+        if (string.Equals(arg, "--decide", StringComparison.OrdinalIgnoreCase))
         {
             continue;
         }
@@ -309,6 +395,13 @@ static Dictionary<string, string?> ParseWorkerOverrides(IEnumerable<string> args
         if (arg.StartsWith(htmlOutputPrefix, StringComparison.OrdinalIgnoreCase))
         {
             overrides["RepoOps:Worker:SummaryHtmlOutputPath"] = arg[htmlOutputPrefix.Length..];
+            continue;
+        }
+
+        const string reportPathPrefix = "--report-path=";
+        if (arg.StartsWith(reportPathPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            overrides["RepoOps:Worker:SupervisorInputReportPath"] = arg[reportPathPrefix.Length..];
             continue;
         }
     }

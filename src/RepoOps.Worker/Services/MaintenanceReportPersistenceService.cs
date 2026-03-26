@@ -32,6 +32,28 @@ public sealed class MaintenanceReportPersistenceService(IOptions<RepoOpsWorkerOp
             cancellationToken);
     }
 
+    public async Task<MaintenanceRunReport> LoadAsync(string reportPath, CancellationToken cancellationToken)
+    {
+        var fullPath = Path.GetFullPath(reportPath);
+
+        if (!File.Exists(fullPath))
+        {
+            throw new FileNotFoundException(
+                $"Le rapport source '{fullPath}' est introuvable.",
+                fullPath);
+        }
+
+        var json = await File.ReadAllTextAsync(fullPath, cancellationToken);
+        var report = JsonSerializer.Deserialize<MaintenanceRunReport>(json, JsonOptions);
+
+        if (report is null)
+        {
+            throw new InvalidOperationException($"Le rapport source '{fullPath}' est invalide ou vide.");
+        }
+
+        return report;
+    }
+
     public string Serialize(MaintenanceRunReport report) => JsonSerializer.Serialize(report, JsonOptions);
 
     private static async Task WriteFileAsync(

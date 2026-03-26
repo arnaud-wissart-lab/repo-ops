@@ -67,10 +67,12 @@ Déplacer progressivement la logique utile vers la couche `.NET`, tout en conser
 ### Objectif
 
 Ajouter une couche de supervision capable de piloter des tâches de delivery multi-repo sans remettre en cause le socle d’exécution existant.
+Le premier jalon concret est un moteur de décisions non exécutant branché sur le rapport du worker.
 
 ### Livrables
 
 - conception documentée du superviseur IA ;
+- moteur de décisions structuré et digest dédié, sans exécution automatique ;
 - séparation explicite des rôles `planner`, `implementer`, `reviewer`, `QA` et `reporter` ;
 - gabarits de tâches standardisés ;
 - critères d’arrêt, de validation et de synthèse ;
@@ -85,5 +87,6 @@ Ajouter une couche de supervision capable de piloter des tâches de delivery mul
 ### Critères de validation
 
 - l’extension future reste compatible avec les `AGENTS.md` des dépôts cibles ;
+- le dépôt sait déjà produire des décisions structurées et explicables à partir d’un rapport ;
 - la séparation des rôles et des critères d’arrêt est explicite ;
 - aucune automatisation non maîtrisée n’est introduite avant l’implémentation réelle.

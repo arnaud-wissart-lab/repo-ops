@@ -9,6 +9,7 @@ public sealed class MaintenanceWorkflowService(
     MaintenanceReportBuilder reportBuilder,
     MaintenanceDigestRenderer digestRenderer,
     MaintenanceReportPersistenceService persistenceService,
+    SupervisorDecisionWorkflowService supervisorDecisionWorkflowService,
     IOptions<RepoOpsWorkerOptions> options)
 {
     private readonly SemaphoreSlim executionLock = new(1, 1);
@@ -46,6 +47,7 @@ public sealed class MaintenanceWorkflowService(
             };
 
             await persistenceService.PersistAsync(report, timeoutCts.Token);
+            await supervisorDecisionWorkflowService.RunAsync(report, emitJsonToStdout: false, timeoutCts.Token);
 
             if (emitJsonToStdout)
             {

@@ -20,6 +20,8 @@
    - JSON stable
    - texte
    - HTML
+   - décisions superviseur JSON
+   - digest superviseur texte
 5. `n8n` consomme le JSON renvoyé directement par le worker.
 6. `n8n` envoie l’email à partir du digest déjà produit.
 
@@ -62,7 +64,30 @@ Dans l’état actuel, le worker :
 - calcule une décision d’auto-merge par PR (`AutoMerge`, `ManualReview`, `Blocked`, `Failed`) ;
 - peut exécuter un merge GitHub réel si la politique est activée et si le mode dry-run est désactivé ;
 - peut appliquer des overrides par dépôt via une politique JSON simple ;
+- produit une première couche de décisions structurées à partir du rapport consolidé ;
 - peut émettre le JSON sur `stdout` en mode explicite.
+
+### Superviseur IA de premier niveau
+
+Le superviseur introduit dans ce lot n’est pas un orchestrateur autonome et n’exécute rien directement.
+
+Il :
+
+- consomme le rapport `MaintenanceRunReport` déjà produit ;
+- applique un petit ensemble de règles déterministes et explicables ;
+- génère un artefact JSON distinct de décisions ;
+- génère un digest texte lisible ;
+- expose un mode CLI et un endpoint HTTP dédiés.
+
+Le premier lot de règles retenu est volontairement sobre :
+
+- `patch` + checks verts + décision `AutoMerge` : `AutoMergeEligible`
+- `minor` : `Review`
+- `major` : `Review` en priorité haute
+- checks en échec : `FixRequired`
+- vulnérabilité critique : priorité haute
+
+Cette couche ne déclenche encore ni merge, ni PR, ni agent externe. Elle prépare seulement le terrain pour un superviseur plus riche dans les lots suivants.
 
 ### Aspire AppHost
 
@@ -196,6 +221,7 @@ Chaque override peut :
 - l’auto-merge réel reste conservateur et peut refuser des PR pourtant mergeables si le contexte GitHub n’est pas strictement `clean` ;
 - les overrides par dépôt ne prennent pas encore en charge des motifs globaux ou des groupes de dépôts ;
 - l’API HTTP du worker reste locale au réseau Docker et ne porte pas encore de mécanisme d’authentification dédié ;
+- le superviseur actuel repose uniquement sur des règles codées en dur et n’utilise encore ni planification multi-étapes ni agents d’implémentation ;
 - l'intégration GitHub n'exploite pas encore les issues, les dépendances de sécurité ni l'historique détaillé d'exécution de Renovate ;
 - le flux quotidien n8n ne relance pas `Renovate` automatiquement ; il exploite le dernier résultat connu.
 
@@ -209,6 +235,7 @@ flowchart LR
     Compose -. maintenance explicite .-> Renovate["Renovate"]
     N8N --> Worker
     Worker --> Reports["Réponse JSON + TXT + HTML"]
+    Worker --> Supervisor["Décisions superviseur JSON + digest texte"]
     Worker -. exécution explicite .-> Renovate
     Worker --> RenovateArtifact["Artefact renovate-execution.json"]
     N8N --> Reports

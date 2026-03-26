@@ -45,6 +45,7 @@ Par défaut, il démarre :
 
 Dans ce lot, le worker devient la source de vérité du reporting et interroge réellement GitHub pour une première collecte ciblée.
 Il calcule également des décisions d’auto-merge contrôlé sur les PR Renovate ouvertes et collecte une première vue des vulnérabilités via les `Dependabot alerts`.
+Il embarque désormais une première couche de superviseur IA fondée sur des règles simples, qui transforme le rapport en décisions structurées sans exécuter ces décisions.
 
 ### Aspire AppHost
 
@@ -82,10 +83,48 @@ Le dossier `scripts/` reste présent pour la transition, mais il ne fait plus pa
    - [`worker-summary.json`](./reports/worker-summary.json)
    - [`worker-summary.txt`](./reports/worker-summary.txt)
    - [`worker-summary.html`](./reports/worker-summary.html)
+   - [`supervisor-decisions.json`](./reports/supervisor-decisions.json)
+   - [`supervisor-decisions.txt`](./reports/supervisor-decisions.txt)
    - [`renovate-execution.json`](./reports/renovate-execution.json) lorsqu'une exécution explicite de `Renovate` est lancée via le worker
    Le worker interroge GitHub avec `GITHUB_TOKEN` pour récupérer les PR Renovate ouvertes, les PR Renovate fusionnées récemment, les fermetures sans fusion récentes, les checks utiles à la qualification opérationnelle, les `Dependabot alerts` ouvertes et corrigées quand elles sont disponibles, ainsi que les informations nécessaires à une décision d’auto-merge contrôlé.
 5. `n8n` lit le JSON renvoyé directement par l’API du worker.
 6. `n8n` envoie l’email en réutilisant directement le sujet, le texte et le HTML déjà préparés.
+
+## Superviseur IA de premier niveau
+
+Le superviseur introduit dans ce lot reste volontairement limité :
+
+- il prend en entrée le rapport JSON du worker ;
+- il applique des règles déterministes et explicables ;
+- il produit une liste d’actions structurées et un digest dédié ;
+- il n’exécute aucun merge, aucune PR et aucune commande externe.
+
+Les types d’action actuellement produits sont :
+
+- `AutoMergeEligible`
+- `Review`
+- `FixRequired`
+- `Ignore`
+
+Les règles initiales sont volontairement simples :
+
+- PR `patch` avec checks verts et décision d’auto-merge positive : `AutoMergeEligible`
+- PR `minor` : `Review`
+- PR `major` : `Review` en priorité haute
+- checks en échec : `FixRequired`
+- vulnérabilité critique corrélée : priorité haute
+
+Mode CLI :
+
+```powershell
+dotnet run --project .\src\RepoOps.Worker -- --decide --report-path=reports/worker-summary.json --emit-json-to-stdout
+```
+
+Mode HTTP :
+
+```powershell
+Invoke-WebRequest -Uri "http://127.0.0.1:8080/supervisor/decisions" -Method Post -ContentType "application/json" -InFile ".\reports\worker-summary.json" | Select-Object -ExpandProperty Content
+```
 
 ## Auto-merge contrôlé
 
@@ -252,9 +291,10 @@ Cette couche Aspire sert au pilotage local. Pour les exécutions réelles de la 
 - l’exécution explicite de `Renovate` supervisée par le worker doit être lancée depuis l’hôte, pas depuis le conteneur `worker` ;
 - la qualification du run `Renovate` repose encore sur des heuristiques de logs `stdout` et `stderr` ;
 - le worker expose désormais une API locale simple, mais sans authentification dédiée à ce stade car elle reste confinée au réseau Docker interne ;
+- le superviseur IA actuel est uniquement un moteur de décisions à règles fixes ; il n’orchestre encore aucun agent ni aucune exécution de tâche ;
 - la configuration SMTP et les destinataires restent à finaliser manuellement dans `n8n` ;
 - le workflow quotidien exploite le dernier résultat connu de `Renovate`, mais ne le relance pas automatiquement ;
-- le superviseur IA n’est pas implémenté.
+- la sortie du superviseur est distincte du rapport principal et n’est pas encore consommée par `n8n`.
 
 ## Vérifications locales
 
@@ -271,7 +311,9 @@ docker compose exec n8n n8n import:workflow --input=/files/workflows/repo-ops-da
 dotnet build .\RepoOps.sln
 Invoke-WebRequest -Uri "http://127.0.0.1:8080/health" | Select-Object -ExpandProperty Content
 Invoke-WebRequest -Uri "http://127.0.0.1:8080/maintenance/run" -Method Post -ContentType "application/json" -Body '{"inputSource":"validation-http","triggerRenovateExecution":false}' | Select-Object -ExpandProperty Content
+Invoke-WebRequest -Uri "http://127.0.0.1:8080/supervisor/decisions" -Method Post -ContentType "application/json" -InFile ".\reports\worker-summary.json" | Select-Object -ExpandProperty Content
 dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --run-once --emit-json-to-stdout --input-source=validation-cli
+dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --decide --report-path=reports/worker-summary.json --emit-json-to-stdout
 dotnet run --project .\src\RepoOps.Worker -- --run-once --run-renovate --emit-json-to-stdout --input-source=validation-renovate
 $env:AUTOMERGE_ENABLED="true"
 $env:AUTOMERGE_DRY_RUN_ENABLED="true"
@@ -402,4 +444,29 @@ Exemple de log utile en cas de qualification partielle :
 ```text
 [github] Check-runs indisponibles pour owner/repo#123 : GitHub a répondu avec le statut HTTP 404
 [renovate] INFO: Repository started
+```
+
+Exemple de sortie du superviseur :
+
+```json
+{
+  "sourceReportStatus": "Partial",
+  "summary": {
+    "totalActions": 3,
+    "reviewActions": 1,
+    "autoMergeEligibleActions": 1,
+    "fixRequiredActions": 1,
+    "ignoreActions": 0,
+    "highPriorityActions": 2
+  },
+  "actions": [
+    {
+      "type": "AutoMergeEligible",
+      "repository": "owner/repo-a",
+      "pullRequestNumber": 42,
+      "priority": "High",
+      "reason": "La mise à jour patch est prête, avec checks verts et décision d'auto-merge positive. La PR est corrélée à une vulnérabilité critique et doit être priorisée."
+    }
+  ]
+}
 ```

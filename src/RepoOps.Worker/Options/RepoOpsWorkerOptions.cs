@@ -19,4 +19,8 @@ public sealed class RepoOpsWorkerOptions
     public string SummaryTextOutputPath { get; set; } = "reports/worker-summary.txt";
 
     public string SummaryHtmlOutputPath { get; set; } = "reports/worker-summary.html";
+
+    public string SupervisorOutputPath { get; set; } = "reports/supervisor-decisions.json";
+
+    public string SupervisorDigestOutputPath { get; set; } = "reports/supervisor-decisions.txt";
 }

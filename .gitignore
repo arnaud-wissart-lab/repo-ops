@@ -58,6 +58,7 @@ desktop.ini
 node_modules/
 dist/
 .vite/
+*.tsbuildinfo
 
 # Artefacts .NET
 **/bin/

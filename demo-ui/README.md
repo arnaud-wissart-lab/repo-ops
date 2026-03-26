@@ -27,6 +27,12 @@ La page n’exécute pas :
 Le bouton de déploiement local vise la machine sur laquelle le worker tourne. Dans le cas de `repo-ops`, il vise ce dépôt sur la machine personnelle et expose le contrôle public de `https://repoops.arnaudwissart.fr`. Dans le mode par défaut, il reste en `dry-run` tant que la configuration backend n’est pas ouverte au réel.
 Ce bouton reste toutefois un outil de démonstration locale. Le flux principal de déploiement du dépôt passe désormais par le workflow GitHub Actions `Déploiement Manuel`.
 
+En environnement déployé, la démo est maintenant servie par un conteneur Nginx sur `127.0.0.1:8084`, avec un proxy local vers le worker pour :
+
+- `/maintenance/*`
+- `/supervisor/*`
+- `/deployment/*`
+
 ## Structure frontend
 
 - [`src/App.tsx`](./src/App.tsx) : orchestration du scénario et états principaux ;

@@ -151,10 +151,12 @@ COMPOSE_FILE="docker-compose.yml"
 ENV_FILE=".env"
 ENV_EXAMPLE_FILE=".env.example"
 COMPOSE_PROJECT="repo-ops-home"
+LOCAL_DEMO_UI_URL="http://127.0.0.1:8084"
 HEALTHCHECK_URL="https://repoops.arnaudwissart.fr"
 HEALTHCHECK_TIMEOUT_SECONDS=300
 HEALTHCHECK_POLL_SECONDS=5
-EXPECTED_SERVICES=("worker" "postgres" "n8n")
+EXPECTED_MARKER="RepoOps Live Demo"
+EXPECTED_SERVICES=("demo-ui" "worker" "postgres" "n8n")
 
 APP_PARENT_DIR="$(dirname "$APP_DIR")"
 COMPOSE_FILE_PATH="${APP_DIR}/${COMPOSE_FILE}"
@@ -242,6 +244,32 @@ log "Build et démarrage de la stack home via docker compose"
 log "Vérification de l'état compose"
 "${compose_cmd[@]}" --env-file "$ENV_FILE_PATH" -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE_PATH" ps
 
+log "Vérification locale de la démo via ${LOCAL_DEMO_UI_URL}"
+local_demo_attempts=$((HEALTHCHECK_TIMEOUT_SECONDS / HEALTHCHECK_POLL_SECONDS))
+if [ "$local_demo_attempts" -lt 1 ]; then
+  local_demo_attempts=1
+fi
+
+local_demo_ready="false"
+for ((attempt=1; attempt<=local_demo_attempts; attempt+=1)); do
+  local_demo_payload="$(curl -fsSL --connect-timeout 3 --max-time 10 "$LOCAL_DEMO_UI_URL" || true)"
+
+  if printf '%s' "$local_demo_payload" | grep -q "$EXPECTED_MARKER"; then
+    local_demo_ready="true"
+    log "Démo locale OK via ${LOCAL_DEMO_UI_URL} (tentative ${attempt}/${local_demo_attempts})."
+    break
+  fi
+
+  log "Démo locale indisponible ou marqueur absent (tentative ${attempt}/${local_demo_attempts})."
+  sleep "$HEALTHCHECK_POLL_SECONDS"
+done
+
+if [ "$local_demo_ready" != "true" ]; then
+  log "La démo locale n'a pas pu être validée via ${LOCAL_DEMO_UI_URL}."
+  "${compose_cmd[@]}" --env-file "$ENV_FILE_PATH" -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE_PATH" logs --tail 120 "${EXPECTED_SERVICES[@]}" || true
+  exit 1
+fi
+
 health_attempts=$((HEALTHCHECK_TIMEOUT_SECONDS / HEALTHCHECK_POLL_SECONDS))
 if [ "$health_attempts" -lt 1 ]; then
   health_attempts=1
@@ -249,15 +277,15 @@ fi
 
 healthy="false"
 for ((attempt=1; attempt<=health_attempts; attempt+=1)); do
-  http_status="$(curl -sS -o /dev/null -I -L -w '%{http_code}' --connect-timeout 3 --max-time 10 "$HEALTHCHECK_URL" || true)"
+  public_payload="$(curl -fsSL --connect-timeout 3 --max-time 10 "$HEALTHCHECK_URL" || true)"
 
-  if [ "$http_status" = "200" ] || [ "$http_status" = "301" ] || [ "$http_status" = "302" ]; then
+  if printf '%s' "$public_payload" | grep -q "$EXPECTED_MARKER"; then
     healthy="true"
-    log "Healthcheck public OK via ${HEALTHCHECK_URL} (tentative ${attempt}/${health_attempts}, code=${http_status})."
+    log "Healthcheck public OK via ${HEALTHCHECK_URL} (tentative ${attempt}/${health_attempts})."
     break
   fi
 
-  log "Healthcheck public indisponible (tentative ${attempt}/${health_attempts}, code=${http_status:-n/a})."
+  log "Healthcheck public indisponible ou marqueur absent (tentative ${attempt}/${health_attempts})."
   sleep "$HEALTHCHECK_POLL_SECONDS"
 done
 

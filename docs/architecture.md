@@ -43,6 +43,7 @@
 
 Par défaut :
 
+- `demo-ui` ;
 - `worker` ;
 - `postgres` ;
 - `n8n`.
@@ -70,6 +71,7 @@ Le flux principal de déploiement retenu pour `repo-ops` suit maintenant le mêm
 - workflow manuel `Déploiement Manuel` ;
 - script SSH [`scripts/deploy-home.sh`](../scripts/deploy-home.sh) ;
 - cible `/home/arnaud/apps/repo-ops` ;
+- exposition locale de la démo sur `127.0.0.1:8084` ;
 - vérification finale via `https://repoops.arnaudwissart.fr`.
 
 ### Worker .NET

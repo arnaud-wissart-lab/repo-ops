@@ -26,6 +26,7 @@ Cycle cible :
 
 Par défaut, il démarre :
 
+- `demo-ui`, interface web de démonstration publiée localement ;
 - `worker`, future couche métier principale ;
 - `postgres`, utilisé par `n8n` ;
 - `n8n`, pour les cron et l’envoi d’email.
@@ -663,6 +664,8 @@ npm run dev
 Le bouton `Déployer en local` appelle `POST /deployment/run`.
 Il reste utile pour illustrer un déploiement local explicite quand le worker est lancé sur l’hôte via `dotnet run`.
 Le flux principal de déploiement reste toutefois le bouton GitHub Actions `Déploiement Manuel`, qui cible la machine personnelle via SSH et déploie le dépôt dans `/home/arnaud/apps/repo-ops`.
+
+En mode déployé sur votre machine, la démo frontend est désormais publiée localement sur `127.0.0.1:8084`, puis servie publiquement via `https://repoops.arnaudwissart.fr` par le reverse proxy déjà en place.
 
 ## CI et déploiement manuel via GitHub Actions
 

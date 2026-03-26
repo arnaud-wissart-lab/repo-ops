@@ -54,6 +54,8 @@ Le script de déploiement utilise :
 - fichier d’environnement : `.env`
 - fichier d’exemple : `.env.example`
 - projet compose : `repo-ops-home`
+- publication locale de la démo : `127.0.0.1:8084`
+- vérification locale post-déploiement : `http://127.0.0.1:8084`
 - vérification post-déploiement : `https://repoops.arnaudwissart.fr`
 - timeout du healthcheck : `300` secondes, polling toutes les `5` secondes
 
@@ -72,12 +74,13 @@ docker compose --env-file .env -p repo-ops-home -f docker-compose.yml up -d --bu
 
 ```bash
 docker compose --env-file .env -p repo-ops-home -f docker-compose.yml ps
-docker compose --env-file .env -p repo-ops-home -f docker-compose.yml logs --tail 120 worker postgres n8n
-curl -I -L https://repoops.arnaudwissart.fr
+docker compose --env-file .env -p repo-ops-home -f docker-compose.yml logs --tail 120 demo-ui worker postgres n8n
+curl -fsSL http://127.0.0.1:8084 | grep "RepoOps Live Demo"
+curl -fsSL https://repoops.arnaudwissart.fr | grep "RepoOps Live Demo"
 ```
 
 ## Points de vigilance
 
 - le workflow de déploiement manuel est la voie principale de déploiement ; le bouton local de la démo frontend reste un outil de démonstration et de vérification locale ;
 - le dépôt cible doit disposer d’un `.env` réellement renseigné, sans quoi le déploiement pourra démarrer techniquement mais restera inutilisable ;
-- le healthcheck public valide l’accessibilité du domaine, pas la complétude fonctionnelle de chaque sous-service.
+- le healthcheck public ne se contente plus d’un simple `200` : il vérifie la présence du marqueur `RepoOps Live Demo`.

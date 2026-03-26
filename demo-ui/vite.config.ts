@@ -18,6 +18,10 @@ export default defineConfig(({ mode }) => {
           target,
           changeOrigin: true,
         },
+        "/deployment": {
+          target,
+          changeOrigin: true,
+        },
       },
     },
   };

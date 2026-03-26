@@ -112,7 +112,7 @@ public sealed class CommitEngineServiceTests
         var operation = Assert.Single(result.Operations);
         Assert.Equal(CommitOperationStatus.Skipped, operation.Status);
         Assert.Contains("Aucun workspace local", operation.ErrorMessage, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(0, fixture.Runner.CallCount);
+        Assert.Equal(0, fixture.GitRunner.CallCount);
     }
 
     [Fact]
@@ -128,7 +128,9 @@ public sealed class CommitEngineServiceTests
         var operation = Assert.Single(result.Operations);
         Assert.Equal(CommitOperationStatus.Skipped, operation.Status);
         Assert.True(operation.DryRun);
-        Assert.Equal(0, fixture.Runner.CallCount);
+        Assert.Equal(CommitValidationStatus.Succeeded, operation.PreCommitValidationStatus);
+        Assert.True(fixture.GitRunner.CallCount > 0);
+        Assert.Equal(1, fixture.ProcessRunner.CallCount);
         Assert.Contains(operation.Logs, log => log.Contains("Dry-run", StringComparison.OrdinalIgnoreCase));
     }
 
@@ -141,6 +143,8 @@ public sealed class CommitEngineServiceTests
         {
             workspaceDirectory = Path.Combine(Path.GetTempPath(), $"repo-ops-commit-test-{Guid.NewGuid():N}");
             Directory.CreateDirectory(workspaceDirectory);
+            File.WriteAllText(Path.Combine(workspaceDirectory, "README.md"), "ancien");
+            File.WriteAllText(Path.Combine(workspaceDirectory, "sample.csproj"), "<Project />");
 
             workspaceMapPath = Path.Combine(Path.GetTempPath(), $"repo-ops-workspaces-{Guid.NewGuid():N}.json");
             File.WriteAllText(
@@ -170,22 +174,34 @@ public sealed class CommitEngineServiceTests
                 DefaultBaseBranch = "main"
             };
 
-            Runner = new RecordingGitCommandRunner();
+            GitRunner = new RecordingGitCommandRunner();
+            ProcessRunner = new RecordingProcessCommandRunner();
             var gitHubApiClient = new GitHubApiClient(
                 new HttpClient(new ThrowOnUseHandler()),
                 Microsoft.Extensions.Options.Options.Create(new GitHubOptions()),
                 NullLogger<GitHubApiClient>.Instance);
+            var preCommitValidationService = new PreCommitValidationService(
+                ProcessRunner,
+                NullLogger<PreCommitValidationService>.Instance,
+                Microsoft.Extensions.Options.Options.Create(Settings));
+            var workspaceExecutionService = new CommitWorkspaceExecutionService(
+                NullLogger<CommitWorkspaceExecutionService>.Instance,
+                GitRunner,
+                gitHubApiClient,
+                new CommitPatchValidationService(),
+                preCommitValidationService);
 
             Service = new CommitEngineService(
                 NullLogger<CommitEngineService>.Instance,
-                Runner,
-                gitHubApiClient,
+                workspaceExecutionService,
                 Microsoft.Extensions.Options.Options.Create(Settings));
         }
 
         public CommitEngineOptions Settings { get; }
 
-        public RecordingGitCommandRunner Runner { get; }
+        public RecordingGitCommandRunner GitRunner { get; }
+
+        public RecordingProcessCommandRunner ProcessRunner { get; }
 
         public CommitEngineService Service { get; }
 
@@ -292,7 +308,60 @@ public sealed class CommitEngineServiceTests
         {
             cancellationToken.ThrowIfCancellationRequested();
             CallCount++;
+
+            if (arguments.StartsWith("remote get-url", StringComparison.Ordinal))
+            {
+                return Task.FromResult(new GitCommandResult(0, "https://github.com/owner/repo-a.git", string.Empty));
+            }
+
+            if (arguments.StartsWith("clone ", StringComparison.Ordinal))
+            {
+                var tempPath = ExtractLastQuotedValue(arguments);
+                Directory.CreateDirectory(tempPath);
+                File.WriteAllText(Path.Combine(tempPath, "README.md"), "ancien");
+                File.WriteAllText(Path.Combine(tempPath, "sample.csproj"), "<Project />");
+                return Task.FromResult(new GitCommandResult(0, string.Empty, string.Empty));
+            }
+
+            if (arguments == "status --porcelain")
+            {
+                return Task.FromResult(new GitCommandResult(0, string.Empty, string.Empty));
+            }
+
+            if (arguments.StartsWith("diff --stat", StringComparison.Ordinal))
+            {
+                return Task.FromResult(new GitCommandResult(0, " README.md | 2 +-", string.Empty));
+            }
+
+            if (arguments.StartsWith("diff --name-only", StringComparison.Ordinal))
+            {
+                return Task.FromResult(new GitCommandResult(0, "README.md", string.Empty));
+            }
+
             return Task.FromResult(new GitCommandResult(0, string.Empty, string.Empty));
+        }
+
+        private static string ExtractLastQuotedValue(string arguments)
+        {
+            var lastQuote = arguments.LastIndexOf('"');
+            var previousQuote = arguments.LastIndexOf('"', lastQuote - 1);
+            return arguments[(previousQuote + 1)..lastQuote];
+        }
+    }
+
+    private sealed class RecordingProcessCommandRunner : IProcessCommandRunner
+    {
+        public int CallCount { get; private set; }
+
+        public Task<ProcessCommandResult> RunAsync(
+            string fileName,
+            string arguments,
+            string workingDirectory,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            CallCount++;
+            return Task.FromResult(new ProcessCommandResult(0, "Build succeeded.", string.Empty));
         }
     }
 

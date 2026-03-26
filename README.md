@@ -325,7 +325,10 @@ Principes retenus :
 - branche dédiée obligatoire pour chaque action ;
 - mode `dry-run` activé par défaut ;
 - aucun commit automatique tant qu’un patch unifié structuré n’est pas disponible dans la réponse associée ;
-- aucun workspace local n’est découvert automatiquement : un mapping dépôt -> chemin local doit être fourni explicitement.
+- aucun workspace local n’est découvert automatiquement : un mapping dépôt -> chemin local doit être fourni explicitement ;
+- toute exécution passe par un clone temporaire dédié ;
+- le patch est contrôlé avant application et refusé s’il est ambigu, invalide ou incohérent ;
+- une validation avant commit est tentée dans le clone temporaire, avec `dotnet build --nologo` par défaut pour un dépôt `.NET`.
 
 Sorties produites :
 
@@ -337,6 +340,15 @@ Le moteur prend en entrée :
 - les validations humaines structurées ;
 - les réponses structurées du client Codex ;
 - un fichier de mapping local des workspaces.
+
+Flux sécurisé retenu :
+
+1. résolution du dépôt source et de son remote ;
+2. clonage dans un répertoire temporaire dédié ;
+3. contrôle strict du patch et des fichiers ciblés ;
+4. application du patch dans le clone temporaire ;
+5. validation avant commit ;
+6. dry-run détaillé ou, si explicitement activé, `commit + push + pull request`.
 
 Exemple de mapping local :
 
@@ -367,6 +379,19 @@ dotnet run --project .\src\RepoOps.Worker -- --execute-validated --enable-real-c
 ```
 
 Le mode réel reste inutilisable tant qu’une réponse structurée ne contient pas `proposedUnifiedDiff`. Le client `Stub` actuel n’en produit pas. Cette étape doit donc être vue comme une enveloppe d’exécution contrôlée prête à être branchée sur un client plus riche, pas comme une automatisation autonome.
+
+Exemple de logs auditables :
+
+```text
+Clone temporaire : C:\Temp\repo-ops-commit-engine\repo-test-1234
+Fetch de origin/main
+Création de branche repo-ops/fix-pr-101
+Fichiers ciblés : README.md, src/Service.cs
+Validation avant commit : Succeeded
+Commande de validation : dotnet build --nologo
+Dry-run : création de branche repo-ops/fix-pr-101
+Dry-run : commit 'fix(maintenance): applique la correction validée'
+```
 
 ## Auto-merge contrôlé
 
@@ -544,7 +569,10 @@ Cette couche Aspire sert au pilotage local. Pour les exécutions réelles de la 
 - les sorties du superviseur et des prompts restent distinctes du rapport principal et ne sont pas encore consommées par `n8n`.
 - le `Commit Engine` reste en `dry-run` par défaut et exige un mapping explicite des workspaces locaux ;
 - le client `Stub` du `Codex Executor` ne produit pas encore de `proposedUnifiedDiff`, ce qui entraîne des opérations ignorées tant qu’un patch structuré n’est pas fourni ;
-- la création réelle de branche, de commit, de push et de pull request n’a de sens que sur un dépôt pilote explicitement déclaré dans le mapping local.
+- la création réelle de branche, de commit, de push et de pull request n’a de sens que sur un dépôt pilote explicitement déclaré dans le mapping local ;
+- le `Commit Engine` refuse désormais les dépôts sources sales, les patchs ambigus et les validations avant commit en échec ;
+- le `Commit Engine` clone le dépôt dans un répertoire temporaire et nettoie ce workspace à la fin de l’exécution ;
+- en cas d’échec après `push`, la branche distante peut déjà exister et doit être vérifiée manuellement.
 
 ## Vérifications locales
 
@@ -809,3 +837,19 @@ Exemple de sortie du `Commit Engine` en dry-run :
   ]
 }
 ```
+
+Procédure prudente pour passer en mode réel sur un dépôt pilote :
+
+1. préparer un fichier de mapping local limité au dépôt pilote ;
+2. vérifier que le dépôt source local est propre ;
+3. conserver `COMMIT_ENGINE_DRY_RUN_ENABLED=true` pour un premier passage ;
+4. relire le rapport JSON et le digest texte du `Commit Engine` ;
+5. activer ensuite seulement :
+
+```powershell
+$env:COMMIT_ENGINE_ALLOW_REAL_EXECUTION="true"
+$env:COMMIT_ENGINE_DRY_RUN_ENABLED="false"
+```
+
+6. relancer le même jeu d’entrées validées ;
+7. contrôler la branche créée et la PR générée avant toute suite.

@@ -139,9 +139,22 @@ builder.Services.AddOptions<CommitEngineOptions>()
         options.InputResponsePath = configuration["COMMIT_ENGINE_INPUT_RESPONSE_PATH"] ?? options.InputResponsePath;
         options.InputValidationPath = configuration["COMMIT_ENGINE_INPUT_VALIDATION_PATH"] ?? options.InputValidationPath;
         options.WorkspaceMapPath = configuration["COMMIT_ENGINE_WORKSPACE_MAP_PATH"] ?? options.WorkspaceMapPath;
+        options.TemporaryWorkspaceRootPath = configuration["COMMIT_ENGINE_TEMPORARY_WORKSPACE_ROOT_PATH"] ?? options.TemporaryWorkspaceRootPath;
         options.BranchPrefix = configuration["COMMIT_ENGINE_BRANCH_PREFIX"] ?? options.BranchPrefix;
         options.PushRemote = configuration["COMMIT_ENGINE_PUSH_REMOTE"] ?? options.PushRemote;
         options.DefaultBaseBranch = configuration["COMMIT_ENGINE_DEFAULT_BASE_BRANCH"] ?? options.DefaultBaseBranch;
+        options.PreCommitValidationCommand = configuration["COMMIT_ENGINE_VALIDATION_COMMAND"] ?? options.PreCommitValidationCommand;
+        options.PreCommitValidationArguments = configuration["COMMIT_ENGINE_VALIDATION_ARGUMENTS"] ?? options.PreCommitValidationArguments;
+
+        if (bool.TryParse(configuration["COMMIT_ENGINE_PRECOMMIT_VALIDATION_ENABLED"], out var preCommitValidationEnabled))
+        {
+            options.PreCommitValidationEnabled = preCommitValidationEnabled;
+        }
+
+        if (int.TryParse(configuration["COMMIT_ENGINE_VALIDATION_TIMEOUT_SECONDS"], out var validationTimeoutSeconds))
+        {
+            options.PreCommitValidationTimeoutSeconds = validationTimeoutSeconds;
+        }
     });
 builder.Services.AddHttpClient<GitHubApiClient>();
 builder.Services.AddSingleton<ICodexClient>(serviceProvider =>
@@ -184,6 +197,10 @@ builder.Services.AddSingleton<ValidationDigestRenderer>();
 builder.Services.AddSingleton<ValidationPersistenceService>();
 builder.Services.AddSingleton<ValidationWorkflowService>();
 builder.Services.AddSingleton<IGitCommandRunner, GitCommandRunner>();
+builder.Services.AddSingleton<IProcessCommandRunner, ProcessCommandRunner>();
+builder.Services.AddSingleton<CommitPatchValidationService>();
+builder.Services.AddSingleton<PreCommitValidationService>();
+builder.Services.AddSingleton<CommitWorkspaceExecutionService>();
 builder.Services.AddSingleton<CommitEngineService>();
 builder.Services.AddSingleton<CommitDigestRenderer>();
 builder.Services.AddSingleton<CommitExecutionPersistenceService>();

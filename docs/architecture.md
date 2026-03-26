@@ -173,6 +173,9 @@ Il :
 - exige une action `Approved` avec `readyForExecution=true` ;
 - exige un patch unifié structuré dans la réponse associée ;
 - exige un mapping explicite `dépôt -> workspace local` ;
+- clone le dépôt dans un workspace temporaire dédié ;
+- contrôle les fichiers ciblés avant application du patch ;
+- tente une validation avant commit dans le clone temporaire ;
 - crée une branche dédiée ;
 - applique le patch ;
 - crée un commit ;
@@ -185,7 +188,9 @@ Protections retenues :
 - aucun push direct vers `main` ou `master` ;
 - aucun déclenchement implicite depuis `n8n` ;
 - aucun commit sans validation humaine préalable ;
-- rollback local simple si l’échec survient avant la création du commit ;
+- refus des patchs ambigus ou incohérents ;
+- refus des dépôts sources locaux non propres ;
+- nettoyage du workspace temporaire après exécution ;
 - logs détaillés et digest dédié.
 
 Dans l’état actuel, l’exécution réelle reste surtout une enveloppe sécurisée prête pour un futur client Codex capable de fournir un `proposedUnifiedDiff` exploitable.
@@ -334,6 +339,7 @@ Chaque override peut :
 - le `Commit Engine` n’est pas appelé par `n8n` et reste un flux CLI explicite ;
 - le `Commit Engine` ne peut agir réellement que si la réponse structurée contient un `proposedUnifiedDiff` ;
 - le client `Stub` actuel ne produit pas de patch unifié, ce qui maintient les exécutions au niveau du dry-run ou du `skipped` contrôlé ;
+- la validation avant commit reste volontairement simple et repose principalement sur `dotnet build` quand un dépôt `.NET` est détecté ;
 - l'intégration GitHub n'exploite pas encore les issues, les dépendances de sécurité ni l'historique détaillé d'exécution de Renovate ;
 - le flux quotidien n8n ne relance pas `Renovate` automatiquement ; il exploite le dernier résultat connu.
 

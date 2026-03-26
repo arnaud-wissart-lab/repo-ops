@@ -8,8 +8,7 @@ namespace RepoOps.Worker.Services;
 
 public sealed class CommitEngineService(
     ILogger<CommitEngineService> logger,
-    IGitCommandRunner gitCommandRunner,
-    GitHubApiClient gitHubApiClient,
+    CommitWorkspaceExecutionService commitWorkspaceExecutionService,
     IOptions<CommitEngineOptions> options)
 {
     public async Task<CommitExecutionResult> ExecuteAsync(
@@ -198,7 +197,6 @@ public sealed class CommitEngineService(
         var (commitSubject, commitBody) = BuildCommitMessage(validatedAction, operationType);
         var pullRequestTitle = BuildPullRequestTitle(validatedAction, operationType);
         var pullRequestBody = BuildPullRequestBody(validatedAction, operationType);
-        var logs = new List<string>();
 
         var guardRailFailureReason = ResolveGuardRailFailureReason(validatedAction, response, workspace, settings);
         if (guardRailFailureReason is not null)
@@ -217,37 +215,7 @@ public sealed class CommitEngineService(
                 dryRun: settings.DryRunEnabled || !settings.AllowRealExecution);
         }
 
-        if (settings.DryRunEnabled || !settings.AllowRealExecution)
-        {
-            logs.Add($"Dry-run : création de branche {branchName}");
-            logs.Add("Dry-run : application du patch unifié");
-            logs.Add($"Dry-run : commit '{commitSubject}'");
-            logs.Add($"Dry-run : push vers {settings.PushRemote}/{branchName}");
-
-            if (settings.CreatePullRequest)
-            {
-                logs.Add($"Dry-run : création de pull request '{pullRequestTitle}' vers {baseBranch}");
-            }
-
-            return new CommitOperationRecord
-            {
-                ActionId = validatedAction.ActionId,
-                Repository = validatedAction.Repository,
-                WorkspacePath = workspace!.LocalPath,
-                BranchName = branchName,
-                BaseBranch = baseBranch,
-                OperationType = operationType,
-                Status = CommitOperationStatus.Skipped,
-                DryRun = true,
-                CommitSubject = commitSubject,
-                CommitBody = commitBody,
-                PullRequestTitle = pullRequestTitle,
-                PullRequestBody = pullRequestBody,
-                Logs = logs
-            };
-        }
-
-        return await ExecuteRealOperationAsync(
+        return await commitWorkspaceExecutionService.ExecuteAsync(
             validatedAction,
             response!,
             workspace!,
@@ -260,175 +228,6 @@ public sealed class CommitEngineService(
             pullRequestTitle,
             pullRequestBody,
             cancellationToken);
-    }
-
-    private async Task<CommitOperationRecord> ExecuteRealOperationAsync(
-        ValidatedAction validatedAction,
-        CodexExecutionResponse response,
-        RepositoryWorkspaceEntry workspace,
-        CommitEngineOptions settings,
-        CommitOperationType operationType,
-        string branchName,
-        string baseBranch,
-        string commitSubject,
-        string commitBody,
-        string pullRequestTitle,
-        string pullRequestBody,
-        CancellationToken cancellationToken)
-    {
-        var logs = new List<string>();
-        var branchCreated = false;
-        var commitCreated = false;
-        string previousBranch = string.Empty;
-
-        try
-        {
-            if (settings.RequireCleanWorktree)
-            {
-                var status = await gitCommandRunner.RunAsync(workspace.LocalPath, "status --porcelain", null, cancellationToken);
-                if (status.ExitCode != 0)
-                {
-                    return BuildFailedOperation(validatedAction, workspace.LocalPath, branchName, baseBranch, operationType, commitSubject, commitBody, pullRequestTitle, pullRequestBody, $"Impossible de lire l'état Git : {status.StandardError}", logs);
-                }
-
-                if (!string.IsNullOrWhiteSpace(status.StandardOutput))
-                {
-                    return BuildSkippedOperation(validatedAction, workspace.LocalPath, branchName, baseBranch, operationType, commitSubject, commitBody, pullRequestTitle, pullRequestBody, "Le workspace Git n'est pas propre.", dryRun: false);
-                }
-            }
-
-            var currentBranch = await gitCommandRunner.RunAsync(workspace.LocalPath, "branch --show-current", null, cancellationToken);
-            previousBranch = currentBranch.StandardOutput.Trim();
-
-            logs.Add($"Fetch de {settings.PushRemote}/{baseBranch}");
-            var fetch = await gitCommandRunner.RunAsync(workspace.LocalPath, $"fetch {settings.PushRemote} {baseBranch}", null, cancellationToken);
-            if (fetch.ExitCode != 0)
-            {
-                return BuildFailedOperation(validatedAction, workspace.LocalPath, branchName, baseBranch, operationType, commitSubject, commitBody, pullRequestTitle, pullRequestBody, $"Échec du fetch Git : {fetch.StandardError}", logs);
-            }
-
-            logs.Add($"Création de branche {branchName}");
-            var checkout = await gitCommandRunner.RunAsync(workspace.LocalPath, $"checkout -B {branchName} {settings.PushRemote}/{baseBranch}", null, cancellationToken);
-            if (checkout.ExitCode != 0)
-            {
-                return BuildFailedOperation(validatedAction, workspace.LocalPath, branchName, baseBranch, operationType, commitSubject, commitBody, pullRequestTitle, pullRequestBody, $"Échec de création de branche : {checkout.StandardError}", logs);
-            }
-
-            branchCreated = true;
-
-            logs.Add("Application du patch unifié");
-            var apply = await gitCommandRunner.RunAsync(workspace.LocalPath, "apply --whitespace=nowarn -", response.ProposedUnifiedDiff, cancellationToken);
-            if (apply.ExitCode != 0)
-            {
-                await TryRollbackAsync(workspace.LocalPath, previousBranch, branchName, branchCreated, commitCreated, logs, cancellationToken);
-                return BuildFailedOperation(validatedAction, workspace.LocalPath, branchName, baseBranch, operationType, commitSubject, commitBody, pullRequestTitle, pullRequestBody, $"Échec d'application du patch : {apply.StandardError}", logs);
-            }
-
-            var changedFiles = await gitCommandRunner.RunAsync(workspace.LocalPath, "status --porcelain", null, cancellationToken);
-            if (changedFiles.ExitCode != 0 || string.IsNullOrWhiteSpace(changedFiles.StandardOutput))
-            {
-                await TryRollbackAsync(workspace.LocalPath, previousBranch, branchName, branchCreated, commitCreated, logs, cancellationToken);
-                return BuildSkippedOperation(validatedAction, workspace.LocalPath, branchName, baseBranch, operationType, commitSubject, commitBody, pullRequestTitle, pullRequestBody, "Aucun changement détecté après application du patch.", dryRun: false);
-            }
-
-            logs.Add("Ajout des changements à l'index Git");
-            var add = await gitCommandRunner.RunAsync(workspace.LocalPath, "add -A", null, cancellationToken);
-            if (add.ExitCode != 0)
-            {
-                await TryRollbackAsync(workspace.LocalPath, previousBranch, branchName, branchCreated, commitCreated, logs, cancellationToken);
-                return BuildFailedOperation(validatedAction, workspace.LocalPath, branchName, baseBranch, operationType, commitSubject, commitBody, pullRequestTitle, pullRequestBody, $"Échec du git add : {add.StandardError}", logs);
-            }
-
-            logs.Add($"Création du commit '{commitSubject}'");
-            var commit = await gitCommandRunner.RunAsync(workspace.LocalPath, $"commit -m \"{EscapeArgument(commitSubject)}\" -m \"{EscapeArgument(commitBody)}\"", null, cancellationToken);
-            if (commit.ExitCode != 0)
-            {
-                await TryRollbackAsync(workspace.LocalPath, previousBranch, branchName, branchCreated, commitCreated, logs, cancellationToken);
-                return BuildFailedOperation(validatedAction, workspace.LocalPath, branchName, baseBranch, operationType, commitSubject, commitBody, pullRequestTitle, pullRequestBody, $"Échec du commit Git : {commit.StandardError}", logs);
-            }
-
-            commitCreated = true;
-
-            logs.Add($"Push vers {settings.PushRemote}/{branchName}");
-            var push = await gitCommandRunner.RunAsync(workspace.LocalPath, $"push -u {settings.PushRemote} {branchName}", null, cancellationToken);
-            if (push.ExitCode != 0)
-            {
-                logs.Add("Le branch local a été conservé pour diagnostic après échec de push.");
-                return BuildFailedOperation(validatedAction, workspace.LocalPath, branchName, baseBranch, operationType, commitSubject, commitBody, pullRequestTitle, pullRequestBody, $"Échec du push Git : {push.StandardError}", logs);
-            }
-
-            var pullRequestUrl = string.Empty;
-            if (settings.CreatePullRequest)
-            {
-                var parts = validatedAction.Repository.Split('/', 2, StringSplitOptions.TrimEntries);
-                if (parts.Length == 2)
-                {
-                    var pullRequest = await gitHubApiClient.CreatePullRequestAsync(
-                        parts[0],
-                        parts[1],
-                        pullRequestTitle,
-                        pullRequestBody,
-                        branchName,
-                        baseBranch,
-                        cancellationToken);
-
-                    pullRequestUrl = pullRequest.HtmlUrl;
-                    logs.Add($"Pull request créée : {pullRequestUrl}");
-                }
-            }
-
-            return new CommitOperationRecord
-            {
-                ActionId = validatedAction.ActionId,
-                Repository = validatedAction.Repository,
-                WorkspacePath = workspace.LocalPath,
-                BranchName = branchName,
-                BaseBranch = baseBranch,
-                OperationType = operationType,
-                Status = CommitOperationStatus.Success,
-                DryRun = false,
-                CommitSubject = commitSubject,
-                CommitBody = commitBody,
-                PullRequestTitle = pullRequestTitle,
-                PullRequestBody = pullRequestBody,
-                PullRequestUrl = pullRequestUrl,
-                Logs = logs
-            };
-        }
-        catch (Exception exception)
-        {
-            logs.Add($"Exception : {exception.Message}");
-            await TryRollbackAsync(workspace.LocalPath, previousBranch, branchName, branchCreated, commitCreated, logs, cancellationToken);
-            return BuildFailedOperation(validatedAction, workspace.LocalPath, branchName, baseBranch, operationType, commitSubject, commitBody, pullRequestTitle, pullRequestBody, exception.Message, logs);
-        }
-    }
-
-    private async Task TryRollbackAsync(
-        string workspacePath,
-        string previousBranch,
-        string branchName,
-        bool branchCreated,
-        bool commitCreated,
-        List<string> logs,
-        CancellationToken cancellationToken)
-    {
-        if (!branchCreated || commitCreated || string.IsNullOrWhiteSpace(previousBranch))
-        {
-            return;
-        }
-
-        var checkout = await gitCommandRunner.RunAsync(workspacePath, $"checkout {previousBranch}", null, cancellationToken);
-        if (checkout.ExitCode == 0)
-        {
-            var delete = await gitCommandRunner.RunAsync(workspacePath, $"branch -D {branchName}", null, cancellationToken);
-            if (delete.ExitCode == 0)
-            {
-                logs.Add("Rollback local effectué : branche de travail supprimée.");
-                return;
-            }
-        }
-
-        logs.Add("Rollback local impossible ou incomplet. Une vérification manuelle est nécessaire.");
     }
 
     private static CommitOperationType ResolveOperationType(CodexExecutionResponse? response)
@@ -513,7 +312,9 @@ public sealed class CommitEngineService(
             PullRequestTitle = pullRequestTitle,
             PullRequestBody = pullRequestBody,
             ErrorMessage = reason,
-            Logs = [reason]
+            Logs = [reason],
+            PreCommitValidationStatus = CommitValidationStatus.NotRun,
+            PreCommitValidationOutput = "Aucune validation préalable n'a été exécutée."
         };
     }
 
@@ -545,9 +346,9 @@ public sealed class CommitEngineService(
             PullRequestTitle = pullRequestTitle,
             PullRequestBody = pullRequestBody,
             ErrorMessage = errorMessage,
-            Logs = logs
+            Logs = logs,
+            PreCommitValidationStatus = CommitValidationStatus.NotRun,
+            PreCommitValidationOutput = "Aucune validation préalable n'a été exécutée."
         };
     }
-
-    private static string EscapeArgument(string value) => value.Replace("\"", "\\\"");
 }

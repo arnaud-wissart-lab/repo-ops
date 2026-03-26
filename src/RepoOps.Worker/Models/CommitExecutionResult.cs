@@ -17,6 +17,15 @@ public enum CommitOperationStatus
     Skipped
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum CommitValidationStatus
+{
+    NotRun,
+    Succeeded,
+    Failed,
+    Skipped
+}
+
 public sealed class CommitExecutionResult
 {
     public DateTimeOffset GeneratedAtUtc { get; init; } = DateTimeOffset.UtcNow;
@@ -59,6 +68,8 @@ public sealed class CommitOperationRecord
 
     public string WorkspacePath { get; init; } = string.Empty;
 
+    public string TemporaryWorkspacePath { get; init; } = string.Empty;
+
     public string BranchName { get; init; } = string.Empty;
 
     public string BaseBranch { get; init; } = string.Empty;
@@ -80,6 +91,16 @@ public sealed class CommitOperationRecord
     public string PullRequestUrl { get; init; } = string.Empty;
 
     public string ErrorMessage { get; init; } = string.Empty;
+
+    public CommitValidationStatus PreCommitValidationStatus { get; init; } = CommitValidationStatus.NotRun;
+
+    public string PreCommitValidationCommand { get; init; } = string.Empty;
+
+    public string PreCommitValidationOutput { get; init; } = string.Empty;
+
+    public IReadOnlyList<string> ModifiedFiles { get; init; } = Array.Empty<string>();
+
+    public IReadOnlyList<string> DiffSummary { get; init; } = Array.Empty<string>();
 
     public IReadOnlyList<string> Logs { get; init; } = Array.Empty<string>();
 }

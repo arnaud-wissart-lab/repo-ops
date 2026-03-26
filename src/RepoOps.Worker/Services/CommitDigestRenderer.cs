@@ -41,6 +41,26 @@ public sealed class CommitDigestRenderer
                 }
 
                 builder.AppendLine();
+
+                if (operation.ModifiedFiles.Count > 0)
+                {
+                    builder.AppendLine($"  Fichiers : {string.Join(", ", operation.ModifiedFiles)}");
+                }
+
+                if (operation.DiffSummary.Count > 0)
+                {
+                    builder.AppendLine("  Diff :");
+                    foreach (var diffLine in operation.DiffSummary)
+                    {
+                        builder.AppendLine($"  - {diffLine}");
+                    }
+                }
+
+                builder.AppendLine($"  Validation avant commit : {FormatValidationStatus(operation.PreCommitValidationStatus)}");
+                if (!string.IsNullOrWhiteSpace(operation.PreCommitValidationCommand))
+                {
+                    builder.AppendLine($"  Commande : {operation.PreCommitValidationCommand}");
+                }
             }
         }
 
@@ -67,5 +87,13 @@ public sealed class CommitDigestRenderer
         CommitOperationStatus.Success => "succès",
         CommitOperationStatus.Failed => "échec",
         _ => "ignorée"
+    };
+
+    private static string FormatValidationStatus(CommitValidationStatus status) => status switch
+    {
+        CommitValidationStatus.Succeeded => "réussie",
+        CommitValidationStatus.Failed => "en échec",
+        CommitValidationStatus.Skipped => "ignorée",
+        _ => "non exécutée"
     };
 }

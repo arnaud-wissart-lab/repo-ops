@@ -48,9 +48,14 @@ services:
       RepoOps__Commit__InputResponsePath: ${COMMIT_ENGINE_INPUT_RESPONSE_PATH}
       RepoOps__Commit__InputValidationPath: ${COMMIT_ENGINE_INPUT_VALIDATION_PATH}
       RepoOps__Commit__WorkspaceMapPath: ${COMMIT_ENGINE_WORKSPACE_MAP_PATH}
+      RepoOps__Commit__TemporaryWorkspaceRootPath: ${COMMIT_ENGINE_TEMPORARY_WORKSPACE_ROOT_PATH}
       RepoOps__Commit__BranchPrefix: ${COMMIT_ENGINE_BRANCH_PREFIX}
       RepoOps__Commit__PushRemote: ${COMMIT_ENGINE_PUSH_REMOTE}
       RepoOps__Commit__DefaultBaseBranch: ${COMMIT_ENGINE_DEFAULT_BASE_BRANCH}
+      RepoOps__Commit__PreCommitValidationEnabled: ${COMMIT_ENGINE_PRECOMMIT_VALIDATION_ENABLED}
+      RepoOps__Commit__PreCommitValidationCommand: ${COMMIT_ENGINE_VALIDATION_COMMAND}
+      RepoOps__Commit__PreCommitValidationArguments: ${COMMIT_ENGINE_VALIDATION_ARGUMENTS}
+      RepoOps__Commit__PreCommitValidationTimeoutSeconds: ${COMMIT_ENGINE_VALIDATION_TIMEOUT_SECONDS}
     volumes:
       - ./reports:/app/reports
       - ./config:/app/config:ro

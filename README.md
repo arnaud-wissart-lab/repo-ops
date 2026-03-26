@@ -94,9 +94,11 @@ Le dépôt inclut aussi une interface web de démonstration en `React + Vite + T
 Cette UI permet de :
 
 - lancer un run sec ;
+- afficher un pipeline visuel du système ;
 - afficher le résumé global ;
 - visualiser les décisions du superviseur ;
 - consulter les prompts générés ;
+- consulter des logs et le JSON brut dans un panneau développeur ;
 - rappeler explicitement les garde-fous de sécurité.
 
 Elle reste volontairement en mode démonstration :
@@ -105,6 +107,8 @@ Elle reste volontairement en mode démonstration :
 - aucun push ;
 - aucune pull request créée ;
 - aucune action irréversible.
+
+Elle peut aussi charger un scénario mock réaliste lorsque l’API locale n’est pas disponible.
 
 ### Scripts transitoires
 
@@ -644,6 +648,13 @@ L’URL de développement est généralement :
 
 ```text
 http://127.0.0.1:5173
+```
+
+Mode mock forcé :
+
+```powershell
+$env:VITE_DEMO_MODE="mock"
+npm run dev
 ```
 
 ## Limites actuelles

@@ -20,6 +20,8 @@
    - JSON stable
    - texte
    - HTML
+   - historique JSON des runs
+   - index léger des runs
    - décisions superviseur JSON
    - digest superviseur texte
    - prompts superviseur JSON
@@ -72,8 +74,34 @@ Dans l’état actuel, le worker :
 - calcule une décision d’auto-merge par PR (`AutoMerge`, `ManualReview`, `Blocked`, `Failed`) ;
 - peut exécuter un merge GitHub réel si la politique est activée et si le mode dry-run est désactivé ;
 - peut appliquer des overrides par dépôt via une politique JSON simple ;
+- historise chaque exécution avec un `runId`, un statut, une durée et un snapshot de métriques ;
+- expose un mode CLI de consultation des derniers runs ;
 - produit une première couche de décisions structurées à partir du rapport consolidé ;
 - peut émettre le JSON sur `stdout` en mode explicite.
+
+### Observabilité légère
+
+La couche d’observabilité retenue reste volontairement simple :
+
+- aucun service externe ;
+- aucun stockage complexe ;
+- persistance sur fichiers JSON ;
+- consultation locale via CLI.
+
+Chaque run historisé contient :
+
+- le timestamp d’exécution ;
+- le statut global ;
+- l’origine du déclenchement ;
+- la durée ;
+- des métriques simples.
+
+Métriques suivies :
+
+- `AnalyzedPullRequests`
+- `AutoMergedPullRequests`
+- `BlockedPullRequests`
+- `ErrorCount`
 
 ### Superviseur IA de premier niveau
 
@@ -273,6 +301,7 @@ docker compose --profile maintenance run --rm renovate --version
 
 - porter la logique métier de collecte GitHub, consolidation et synthèse ;
 - produire le contrat de sortie de référence ;
+- historiser les runs et exposer leur consultation locale ;
 - qualifier les PR Renovate pour aider la décision opérationnelle ;
 - intégrer une première couche de reporting sécurité à partir des `Dependabot alerts` ;
 - décider si une PR Renovate doit être auto-mergée, revue manuellement ou bloquée ;
@@ -340,6 +369,7 @@ Chaque override peut :
 - le `Commit Engine` ne peut agir réellement que si la réponse structurée contient un `proposedUnifiedDiff` ;
 - le client `Stub` actuel ne produit pas de patch unifié, ce qui maintient les exécutions au niveau du dry-run ou du `skipped` contrôlé ;
 - la validation avant commit reste volontairement simple et repose principalement sur `dotnet build` quand un dépôt `.NET` est détecté ;
+- l’observabilité reste locale et n’expose pas encore de vue agrégée plus riche que l’historique JSON et la consultation CLI ;
 - l'intégration GitHub n'exploite pas encore les issues, les dépendances de sécurité ni l'historique détaillé d'exécution de Renovate ;
 - le flux quotidien n8n ne relance pas `Renovate` automatiquement ; il exploite le dernier résultat connu.
 

@@ -4,6 +4,8 @@ public sealed class MaintenanceRunReport
 {
     public MaintenanceExecutionSummary Summary { get; init; } = new();
 
+    public MaintenanceObservability Observability { get; init; } = new();
+
     public RenovateExecutionDetails RenovateExecution { get; init; } = new();
 
     public PullRequestStatuses PullRequestStatuses { get; init; } = new();

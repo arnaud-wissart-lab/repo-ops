@@ -71,9 +71,64 @@ Dans cette phase, `Renovate` reste volontairement hors du cockpit Aspire afin de
 
 Le workflow versionné ne reconstruit plus la synthèse métier. Il consomme la réponse JSON et les contenus déjà produits par le worker.
 
+### Observabilité légère
+
+Le worker ajoute une couche d’observabilité locale sans service externe :
+
+- historique JSON des runs sous `reports/history/` ;
+- index léger des derniers runs ;
+- métriques simples pour suivre le comportement du système dans le temps ;
+- logs structurés autour d’un `runId`.
+
+Les métriques actuellement suivies sont :
+
+- nombre de PR analysées ;
+- nombre de PR auto-mergées ;
+- nombre de PR bloquées ;
+- nombre d’erreurs détectées côté exécution.
+
 ### Scripts transitoires
 
 Le dossier `scripts/` reste présent pour la transition, mais il ne fait plus partie du flux réel retenu. Les scripts servent encore à des vérifications locales ou à un secours ponctuel, pas à la logique métier principale.
+
+## Consultation de l’historique
+
+Le worker expose un mode CLI léger pour consulter les derniers runs sans dépendance externe :
+
+```powershell
+dotnet run --project .\src\RepoOps.Worker -- --show-runs
+```
+
+Pour limiter le nombre d’entrées affichées :
+
+```powershell
+dotnet run --project .\src\RepoOps.Worker -- --show-runs --show-runs-count=5
+```
+
+Avec sortie JSON :
+
+```powershell
+dotnet run --project .\src\RepoOps.Worker -- --show-runs --show-runs-count=5 --emit-json-to-stdout
+```
+
+Si vous consultez l’historique via le binaire compilé depuis la racine du dépôt, vous pouvez fixer explicitement l’index :
+
+```powershell
+$env:WORKER_RUN_HISTORY_INDEX_PATH="$PWD\src\RepoOps.Worker\reports\history\index.json"
+dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --show-runs --show-runs-count=5
+```
+
+Exemple de sortie texte :
+
+```text
+Runs affichés : 2
+- 2026-03-26 09:00:00 UTC | Success | docker-compose | durée 1842 ms
+  PR analysées : 4, auto-mergées : 1, bloquées : 1, erreurs : 0
+  Rapport : C:\repo-ops\reports\history\20260326-090000-run-....json
+- 2026-03-25 09:00:00 UTC | Partial | http-api | durée 2965 ms
+  PR analysées : 3, auto-mergées : 0, bloquées : 2, erreurs : 1
+  Rapport : C:\repo-ops\reports\history\20260325-090000-run-....json
+```
 
 ## Flux réel retenu
 
@@ -84,6 +139,8 @@ Le dossier `scripts/` reste présent pour la transition, mais il ne fait plus pa
    - [`worker-summary.json`](./reports/worker-summary.json)
    - [`worker-summary.txt`](./reports/worker-summary.txt)
    - [`worker-summary.html`](./reports/worker-summary.html)
+   - [`reports/history/index.json`](./reports/history/index.json)
+   - des snapshots complets horodatés sous [`reports/history/`](./reports/history)
    - [`supervisor-decisions.json`](./reports/supervisor-decisions.json)
    - [`supervisor-decisions.txt`](./reports/supervisor-decisions.txt)
    - [`supervisor-prompts.json`](./reports/supervisor-prompts.json)
@@ -98,6 +155,13 @@ Le dossier `scripts/` reste présent pour la transition, mais il ne fait plus pa
    Le worker interroge GitHub avec `GITHUB_TOKEN` pour récupérer les PR Renovate ouvertes, les PR Renovate fusionnées récemment, les fermetures sans fusion récentes, les checks utiles à la qualification opérationnelle, les `Dependabot alerts` ouvertes et corrigées quand elles sont disponibles, ainsi que les informations nécessaires à une décision d’auto-merge contrôlé.
 5. `n8n` lit le JSON renvoyé directement par l’API du worker.
 6. `n8n` envoie l’email en réutilisant directement le sujet, le texte et le HTML déjà préparés.
+
+Chaque run conserve aussi :
+
+- un `runId` ;
+- un statut global ;
+- une durée d’exécution ;
+- un snapshot de métriques d’observabilité.
 
 ## Superviseur IA de premier niveau
 
@@ -573,6 +637,8 @@ Cette couche Aspire sert au pilotage local. Pour les exécutions réelles de la 
 - le `Commit Engine` refuse désormais les dépôts sources sales, les patchs ambigus et les validations avant commit en échec ;
 - le `Commit Engine` clone le dépôt dans un répertoire temporaire et nettoie ce workspace à la fin de l’exécution ;
 - en cas d’échec après `push`, la branche distante peut déjà exister et doit être vérifiée manuellement.
+- l’observabilité reste volontairement locale et basée sur des fichiers JSON ; il n’y a pas encore de tableau de bord dédié ni d’agrégation temporelle avancée ;
+- le compteur d’erreurs reste volontairement simple et reflète surtout les erreurs d’exécution structurées déjà connues par le worker.
 
 ## Vérifications locales
 
@@ -598,6 +664,7 @@ dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --generate-prom
 dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --execute-prompts --prompts-path=reports/supervisor-prompts.json --emit-json-to-stdout
 dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --validate-responses --responses-path=reports/supervisor-codex-responses.json --validation-input-path=reports/supervisor-validations.json --emit-json-to-stdout
 dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --execute-validated --commit-validation-result-path=reports/supervisor-validations.json --commit-responses-path=reports/supervisor-codex-responses.json --commit-workspace-map-path=config/repository-workspaces.example.json --emit-json-to-stdout
+dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --show-runs --show-runs-count=5
 dotnet run --project .\src\RepoOps.Worker -- --run-once --run-renovate --emit-json-to-stdout --input-source=validation-renovate
 $env:AUTOMERGE_ENABLED="true"
 $env:AUTOMERGE_DRY_RUN_ENABLED="true"

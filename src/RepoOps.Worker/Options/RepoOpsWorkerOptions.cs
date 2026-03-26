@@ -20,6 +20,14 @@ public sealed class RepoOpsWorkerOptions
 
     public string SummaryHtmlOutputPath { get; set; } = "reports/worker-summary.html";
 
+    public string RunHistoryDirectoryPath { get; set; } = "reports/history";
+
+    public string RunHistoryIndexPath { get; set; } = "reports/history/index.json";
+
+    public int RunHistoryRetentionCount { get; set; } = 100;
+
+    public int HistoryViewCount { get; set; } = 10;
+
     public string SupervisorOutputPath { get; set; } = "reports/supervisor-decisions.json";
 
     public string SupervisorDigestOutputPath { get; set; } = "reports/supervisor-decisions.txt";

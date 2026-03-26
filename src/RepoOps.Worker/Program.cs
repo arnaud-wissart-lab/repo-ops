@@ -10,6 +10,7 @@ var generatePromptsRequested = args.Any(arg => string.Equals(arg, "--generate-pr
 var executePromptsRequested = args.Any(arg => string.Equals(arg, "--execute-prompts", StringComparison.OrdinalIgnoreCase));
 var validateResponsesRequested = args.Any(arg => string.Equals(arg, "--validate-responses", StringComparison.OrdinalIgnoreCase));
 var executeValidatedRequested = args.Any(arg => string.Equals(arg, "--execute-validated", StringComparison.OrdinalIgnoreCase));
+var showRunsRequested = args.Any(arg => string.Equals(arg, "--show-runs", StringComparison.OrdinalIgnoreCase));
 var builder = WebApplication.CreateBuilder(ParsePassthroughArguments(args));
 
 builder.Configuration.AddInMemoryCollection(ParseWorkerOverrides(args));
@@ -19,6 +20,22 @@ ConfigureWorkerUrls(builder);
 
 builder.Services.Configure<RepoOpsWorkerOptions>(
     builder.Configuration.GetSection(RepoOpsWorkerOptions.SectionName));
+builder.Services.PostConfigure<RepoOpsWorkerOptions>(options =>
+{
+    var configuration = builder.Configuration;
+    options.RunHistoryDirectoryPath = configuration["WORKER_RUN_HISTORY_DIRECTORY_PATH"] ?? options.RunHistoryDirectoryPath;
+    options.RunHistoryIndexPath = configuration["WORKER_RUN_HISTORY_INDEX_PATH"] ?? options.RunHistoryIndexPath;
+
+    if (int.TryParse(configuration["WORKER_RUN_HISTORY_RETENTION_COUNT"], out var runHistoryRetentionCount))
+    {
+        options.RunHistoryRetentionCount = runHistoryRetentionCount;
+    }
+
+    if (int.TryParse(configuration["WORKER_HISTORY_VIEW_COUNT"], out var historyViewCount))
+    {
+        options.HistoryViewCount = historyViewCount;
+    }
+});
 builder.Services.AddOptions<RenovateExecutionOptions>()
     .Configure<IConfiguration>((options, configuration) =>
     {
@@ -179,6 +196,10 @@ builder.Services.AddSingleton<RenovateExecutionService>();
 builder.Services.AddSingleton<MaintenanceReportBuilder>();
 builder.Services.AddSingleton<MaintenanceDigestRenderer>();
 builder.Services.AddSingleton<MaintenanceReportPersistenceService>();
+builder.Services.AddSingleton<MaintenanceObservabilityBuilder>();
+builder.Services.AddSingleton<RunHistoryPersistenceService>();
+builder.Services.AddSingleton<RunHistoryDigestRenderer>();
+builder.Services.AddSingleton<RunHistoryWorkflowService>();
 builder.Services.AddSingleton<MaintenanceWorkflowService>();
 builder.Services.AddSingleton<SupervisorDecisionEngine>();
 builder.Services.AddSingleton<SupervisorDecisionDigestRenderer>();
@@ -366,6 +387,28 @@ if (executeValidatedRequested)
     catch (Exception exception)
     {
         app.Logger.LogError(exception, "Le Commit Engine CLI a échoué");
+        Environment.ExitCode = 1;
+        return;
+    }
+}
+
+if (showRunsRequested)
+{
+    var emitJsonToStdout = app.Configuration.GetValue<bool>($"{RepoOpsWorkerOptions.SectionName}:EmitJsonToStdout");
+    var requestedCount = app.Configuration.GetValue<int>($"{RepoOpsWorkerOptions.SectionName}:HistoryViewCount");
+
+    try
+    {
+        await RunHistoryAsync(
+            app.Services,
+            requestedCount,
+            emitJsonToStdout,
+            CancellationToken.None);
+        return;
+    }
+    catch (Exception exception)
+    {
+        app.Logger.LogError(exception, "La consultation de l'historique a échoué");
         Environment.ExitCode = 1;
         return;
     }
@@ -637,6 +680,18 @@ static async Task<CommitExecutionResult> RunCommitExecutionFromPathsAsync(
         cancellationToken);
 }
 
+static async Task<RunHistoryViewResult> RunHistoryAsync(
+    IServiceProvider services,
+    int requestedCount,
+    bool emitJsonToStdout,
+    CancellationToken cancellationToken)
+{
+    await using var scope = services.CreateAsyncScope();
+    var workflowService = scope.ServiceProvider.GetRequiredService<RunHistoryWorkflowService>();
+
+    return await workflowService.RunAsync(requestedCount, emitJsonToStdout, cancellationToken);
+}
+
 static MaintenanceRunRequest ResolveCliRequest(IConfiguration configuration)
 {
     return new MaintenanceRunRequest
@@ -706,6 +761,8 @@ static string[] ParsePassthroughArguments(IEnumerable<string> args) =>
         && !arg.StartsWith("--commit-workspace-map-path=", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--enable-real-commit-execution", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--disable-commit-dry-run", StringComparison.OrdinalIgnoreCase)
+        && !arg.StartsWith("--show-runs", StringComparison.OrdinalIgnoreCase)
+        && !arg.StartsWith("--show-runs-count=", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--interactive", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--interactive=", StringComparison.OrdinalIgnoreCase))
         .ToArray();
@@ -742,6 +799,11 @@ static Dictionary<string, string?> ParseWorkerOverrides(IEnumerable<string> args
         }
 
         if (string.Equals(arg, "--execute-validated", StringComparison.OrdinalIgnoreCase))
+        {
+            continue;
+        }
+
+        if (string.Equals(arg, "--show-runs", StringComparison.OrdinalIgnoreCase))
         {
             continue;
         }
@@ -871,6 +933,13 @@ static Dictionary<string, string?> ParseWorkerOverrides(IEnumerable<string> args
         if (arg.StartsWith(commitWorkspaceMapPathPrefix, StringComparison.OrdinalIgnoreCase))
         {
             overrides["RepoOps:Commit:WorkspaceMapPath"] = arg[commitWorkspaceMapPathPrefix.Length..];
+            continue;
+        }
+
+        const string showRunsCountPrefix = "--show-runs-count=";
+        if (arg.StartsWith(showRunsCountPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            overrides["RepoOps:Worker:HistoryViewCount"] = arg[showRunsCountPrefix.Length..];
             continue;
         }
 

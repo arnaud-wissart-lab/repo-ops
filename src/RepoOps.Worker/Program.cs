@@ -9,6 +9,7 @@ var decideRequested = args.Any(arg => string.Equals(arg, "--decide", StringCompa
 var generatePromptsRequested = args.Any(arg => string.Equals(arg, "--generate-prompts", StringComparison.OrdinalIgnoreCase));
 var executePromptsRequested = args.Any(arg => string.Equals(arg, "--execute-prompts", StringComparison.OrdinalIgnoreCase));
 var validateResponsesRequested = args.Any(arg => string.Equals(arg, "--validate-responses", StringComparison.OrdinalIgnoreCase));
+var executeValidatedRequested = args.Any(arg => string.Equals(arg, "--execute-validated", StringComparison.OrdinalIgnoreCase));
 var builder = WebApplication.CreateBuilder(ParsePassthroughArguments(args));
 
 builder.Configuration.AddInMemoryCollection(ParseWorkerOverrides(args));
@@ -103,6 +104,45 @@ builder.Services.AddOptions<ValidationEngineOptions>()
             options.InteractiveMode = interactiveMode;
         }
     });
+builder.Services.AddOptions<CommitEngineOptions>()
+    .Configure<IConfiguration>((options, configuration) =>
+    {
+        configuration.GetSection(CommitEngineOptions.SectionName).Bind(options);
+
+        if (bool.TryParse(configuration["COMMIT_ENGINE_ENABLED"], out var enabled))
+        {
+            options.Enabled = enabled;
+        }
+
+        if (bool.TryParse(configuration["COMMIT_ENGINE_ALLOW_REAL_EXECUTION"], out var allowRealExecution))
+        {
+            options.AllowRealExecution = allowRealExecution;
+        }
+
+        if (bool.TryParse(configuration["COMMIT_ENGINE_DRY_RUN_ENABLED"], out var dryRunEnabled))
+        {
+            options.DryRunEnabled = dryRunEnabled;
+        }
+
+        if (bool.TryParse(configuration["COMMIT_ENGINE_CREATE_PULL_REQUEST"], out var createPullRequest))
+        {
+            options.CreatePullRequest = createPullRequest;
+        }
+
+        if (bool.TryParse(configuration["COMMIT_ENGINE_REQUIRE_CLEAN_WORKTREE"], out var requireCleanWorktree))
+        {
+            options.RequireCleanWorktree = requireCleanWorktree;
+        }
+
+        options.OutputPath = configuration["COMMIT_ENGINE_OUTPUT_PATH"] ?? options.OutputPath;
+        options.DigestOutputPath = configuration["COMMIT_ENGINE_DIGEST_OUTPUT_PATH"] ?? options.DigestOutputPath;
+        options.InputResponsePath = configuration["COMMIT_ENGINE_INPUT_RESPONSE_PATH"] ?? options.InputResponsePath;
+        options.InputValidationPath = configuration["COMMIT_ENGINE_INPUT_VALIDATION_PATH"] ?? options.InputValidationPath;
+        options.WorkspaceMapPath = configuration["COMMIT_ENGINE_WORKSPACE_MAP_PATH"] ?? options.WorkspaceMapPath;
+        options.BranchPrefix = configuration["COMMIT_ENGINE_BRANCH_PREFIX"] ?? options.BranchPrefix;
+        options.PushRemote = configuration["COMMIT_ENGINE_PUSH_REMOTE"] ?? options.PushRemote;
+        options.DefaultBaseBranch = configuration["COMMIT_ENGINE_DEFAULT_BASE_BRANCH"] ?? options.DefaultBaseBranch;
+    });
 builder.Services.AddHttpClient<GitHubApiClient>();
 builder.Services.AddSingleton<ICodexClient>(serviceProvider =>
 {
@@ -143,6 +183,11 @@ builder.Services.AddSingleton<ValidationEngineService>();
 builder.Services.AddSingleton<ValidationDigestRenderer>();
 builder.Services.AddSingleton<ValidationPersistenceService>();
 builder.Services.AddSingleton<ValidationWorkflowService>();
+builder.Services.AddSingleton<IGitCommandRunner, GitCommandRunner>();
+builder.Services.AddSingleton<CommitEngineService>();
+builder.Services.AddSingleton<CommitDigestRenderer>();
+builder.Services.AddSingleton<CommitExecutionPersistenceService>();
+builder.Services.AddSingleton<CommitWorkflowService>();
 
 var app = builder.Build();
 
@@ -280,6 +325,30 @@ if (validateResponsesRequested)
     catch (Exception exception)
     {
         app.Logger.LogError(exception, "Le moteur de validation CLI a échoué");
+        Environment.ExitCode = 1;
+        return;
+    }
+}
+
+if (executeValidatedRequested)
+{
+    var emitJsonToStdout = app.Configuration.GetValue<bool>($"{RepoOpsWorkerOptions.SectionName}:EmitJsonToStdout");
+    var responsePath = app.Configuration[$"{CommitEngineOptions.SectionName}:InputResponsePath"];
+    var validationPath = app.Configuration[$"{CommitEngineOptions.SectionName}:InputValidationPath"];
+
+    try
+    {
+        await RunCommitExecutionFromPathsAsync(
+            app.Services,
+            validationPath,
+            responsePath,
+            emitJsonToStdout,
+            CancellationToken.None);
+        return;
+    }
+    catch (Exception exception)
+    {
+        app.Logger.LogError(exception, "Le Commit Engine CLI a échoué");
         Environment.ExitCode = 1;
         return;
     }
@@ -534,6 +603,23 @@ static async Task<ValidationResult> RunValidationFromPathsAsync(
         cancellationToken);
 }
 
+static async Task<CommitExecutionResult> RunCommitExecutionFromPathsAsync(
+    IServiceProvider services,
+    string? validationPath,
+    string? responsePath,
+    bool emitJsonToStdout,
+    CancellationToken cancellationToken)
+{
+    await using var scope = services.CreateAsyncScope();
+    var workflowService = scope.ServiceProvider.GetRequiredService<CommitWorkflowService>();
+
+    return await workflowService.RunFromPathsAsync(
+        validationPath,
+        responsePath,
+        emitJsonToStdout,
+        cancellationToken);
+}
+
 static MaintenanceRunRequest ResolveCliRequest(IConfiguration configuration)
 {
     return new MaintenanceRunRequest
@@ -586,6 +672,7 @@ static string[] ParsePassthroughArguments(IEnumerable<string> args) =>
         && !arg.StartsWith("--generate-prompts", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--execute-prompts", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--validate-responses", StringComparison.OrdinalIgnoreCase)
+        && !arg.StartsWith("--execute-validated", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--run-renovate", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--enable-auto-merge", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--disable-auto-merge-dry-run", StringComparison.OrdinalIgnoreCase)
@@ -597,6 +684,11 @@ static string[] ParsePassthroughArguments(IEnumerable<string> args) =>
         && !arg.StartsWith("--prompts-path=", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--responses-path=", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--validation-input-path=", StringComparison.OrdinalIgnoreCase)
+        && !arg.StartsWith("--commit-responses-path=", StringComparison.OrdinalIgnoreCase)
+        && !arg.StartsWith("--commit-validation-result-path=", StringComparison.OrdinalIgnoreCase)
+        && !arg.StartsWith("--commit-workspace-map-path=", StringComparison.OrdinalIgnoreCase)
+        && !arg.StartsWith("--enable-real-commit-execution", StringComparison.OrdinalIgnoreCase)
+        && !arg.StartsWith("--disable-commit-dry-run", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--interactive", StringComparison.OrdinalIgnoreCase)
         && !arg.StartsWith("--interactive=", StringComparison.OrdinalIgnoreCase))
         .ToArray();
@@ -632,6 +724,11 @@ static Dictionary<string, string?> ParseWorkerOverrides(IEnumerable<string> args
             continue;
         }
 
+        if (string.Equals(arg, "--execute-validated", StringComparison.OrdinalIgnoreCase))
+        {
+            continue;
+        }
+
         if (string.Equals(arg, "--run-renovate", StringComparison.OrdinalIgnoreCase))
         {
             overrides["RepoOps:Worker:TriggerRenovateExecution"] = "true";
@@ -647,6 +744,19 @@ static Dictionary<string, string?> ParseWorkerOverrides(IEnumerable<string> args
         if (string.Equals(arg, "--disable-auto-merge-dry-run", StringComparison.OrdinalIgnoreCase))
         {
             overrides["RepoOps:AutoMerge:DryRunEnabled"] = "false";
+            continue;
+        }
+
+        if (string.Equals(arg, "--enable-real-commit-execution", StringComparison.OrdinalIgnoreCase))
+        {
+            overrides["RepoOps:Commit:AllowRealExecution"] = "true";
+            overrides["RepoOps:Commit:DryRunEnabled"] = "false";
+            continue;
+        }
+
+        if (string.Equals(arg, "--disable-commit-dry-run", StringComparison.OrdinalIgnoreCase))
+        {
+            overrides["RepoOps:Commit:DryRunEnabled"] = "false";
             continue;
         }
 
@@ -723,6 +833,27 @@ static Dictionary<string, string?> ParseWorkerOverrides(IEnumerable<string> args
         if (arg.StartsWith(validationInputPathPrefix, StringComparison.OrdinalIgnoreCase))
         {
             overrides["RepoOps:Validation:InputValidationPath"] = arg[validationInputPathPrefix.Length..];
+            continue;
+        }
+
+        const string commitResponsesPathPrefix = "--commit-responses-path=";
+        if (arg.StartsWith(commitResponsesPathPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            overrides["RepoOps:Commit:InputResponsePath"] = arg[commitResponsesPathPrefix.Length..];
+            continue;
+        }
+
+        const string commitValidationResultPathPrefix = "--commit-validation-result-path=";
+        if (arg.StartsWith(commitValidationResultPathPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            overrides["RepoOps:Commit:InputValidationPath"] = arg[commitValidationResultPathPrefix.Length..];
+            continue;
+        }
+
+        const string commitWorkspaceMapPathPrefix = "--commit-workspace-map-path=";
+        if (arg.StartsWith(commitWorkspaceMapPathPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            overrides["RepoOps:Commit:WorkspaceMapPath"] = arg[commitWorkspaceMapPathPrefix.Length..];
             continue;
         }
 

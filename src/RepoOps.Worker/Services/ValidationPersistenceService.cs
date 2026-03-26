@@ -85,6 +85,28 @@ public sealed class ValidationPersistenceService(IOptions<ValidationEngineOption
         throw new InvalidOperationException($"Le fichier de validation '{fullPath}' est invalide ou ne contient aucune décision.");
     }
 
+    public async Task<ValidationResult> LoadResultAsync(string validationPath, CancellationToken cancellationToken)
+    {
+        var fullPath = Path.GetFullPath(validationPath);
+
+        if (!File.Exists(fullPath))
+        {
+            throw new FileNotFoundException(
+                $"Le fichier de résultat de validation '{fullPath}' est introuvable.",
+                fullPath);
+        }
+
+        var json = await File.ReadAllTextAsync(fullPath, cancellationToken);
+        var result = JsonSerializer.Deserialize<ValidationResult>(json, JsonOptions);
+
+        if (result is null)
+        {
+            throw new InvalidOperationException($"Le fichier de résultat de validation '{fullPath}' est invalide ou vide.");
+        }
+
+        return result;
+    }
+
     public string Serialize(ValidationResult result) => JsonSerializer.Serialize(result, JsonOptions);
 
     private static async Task WriteFileAsync(

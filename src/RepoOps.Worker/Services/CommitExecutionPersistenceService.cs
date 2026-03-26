@@ -5,14 +5,14 @@ using RepoOps.Worker.Options;
 
 namespace RepoOps.Worker.Services;
 
-public sealed class CodexExecutionPersistenceService(IOptions<CodexExecutorOptions> options)
+public sealed class CommitExecutionPersistenceService(IOptions<CommitEngineOptions> options)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = true
     };
 
-    public async Task PersistAsync(CodexExecutionResult result, CancellationToken cancellationToken)
+    public async Task PersistAsync(CommitExecutionResult result, CancellationToken cancellationToken)
     {
         var settings = options.Value;
 
@@ -27,29 +27,7 @@ public sealed class CodexExecutionPersistenceService(IOptions<CodexExecutorOptio
             cancellationToken);
     }
 
-    public async Task<CodexExecutionResult> LoadAsync(string responsePath, CancellationToken cancellationToken)
-    {
-        var fullPath = Path.GetFullPath(responsePath);
-
-        if (!File.Exists(fullPath))
-        {
-            throw new FileNotFoundException(
-                $"Le fichier de réponses Codex '{fullPath}' est introuvable.",
-                fullPath);
-        }
-
-        var json = await File.ReadAllTextAsync(fullPath, cancellationToken);
-        var result = JsonSerializer.Deserialize<CodexExecutionResult>(json, JsonOptions);
-
-        if (result is null)
-        {
-            throw new InvalidOperationException($"Le fichier de réponses Codex '{fullPath}' est invalide ou vide.");
-        }
-
-        return result;
-    }
-
-    public string Serialize(CodexExecutionResult result) => JsonSerializer.Serialize(result, JsonOptions);
+    public string Serialize(CommitExecutionResult result) => JsonSerializer.Serialize(result, JsonOptions);
 
     private static async Task WriteFileAsync(
         string outputPath,

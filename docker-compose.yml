@@ -38,6 +38,19 @@ services:
       RepoOps__Validation__InputResponsePath: ${VALIDATION_INPUT_RESPONSE_PATH}
       RepoOps__Validation__InputValidationPath: ${VALIDATION_INPUT_FILE_PATH}
       RepoOps__Validation__InteractiveMode: ${VALIDATION_INTERACTIVE_MODE}
+      RepoOps__Commit__Enabled: ${COMMIT_ENGINE_ENABLED}
+      RepoOps__Commit__AllowRealExecution: ${COMMIT_ENGINE_ALLOW_REAL_EXECUTION}
+      RepoOps__Commit__DryRunEnabled: ${COMMIT_ENGINE_DRY_RUN_ENABLED}
+      RepoOps__Commit__CreatePullRequest: ${COMMIT_ENGINE_CREATE_PULL_REQUEST}
+      RepoOps__Commit__RequireCleanWorktree: ${COMMIT_ENGINE_REQUIRE_CLEAN_WORKTREE}
+      RepoOps__Commit__OutputPath: ${COMMIT_ENGINE_OUTPUT_PATH}
+      RepoOps__Commit__DigestOutputPath: ${COMMIT_ENGINE_DIGEST_OUTPUT_PATH}
+      RepoOps__Commit__InputResponsePath: ${COMMIT_ENGINE_INPUT_RESPONSE_PATH}
+      RepoOps__Commit__InputValidationPath: ${COMMIT_ENGINE_INPUT_VALIDATION_PATH}
+      RepoOps__Commit__WorkspaceMapPath: ${COMMIT_ENGINE_WORKSPACE_MAP_PATH}
+      RepoOps__Commit__BranchPrefix: ${COMMIT_ENGINE_BRANCH_PREFIX}
+      RepoOps__Commit__PushRemote: ${COMMIT_ENGINE_PUSH_REMOTE}
+      RepoOps__Commit__DefaultBaseBranch: ${COMMIT_ENGINE_DEFAULT_BASE_BRANCH}
     volumes:
       - ./reports:/app/reports
       - ./config:/app/config:ro

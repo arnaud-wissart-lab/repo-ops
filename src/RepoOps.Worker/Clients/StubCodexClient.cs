@@ -21,6 +21,7 @@ public sealed class StubCodexClient(ILogger<StubCodexClient> logger) : ICodexCli
             ConfidenceLevel = ResolveConfidenceLevel(responseType),
             Summary = BuildSummary(prompt, responseType),
             ResponseText = BuildResponseText(prompt, responseType),
+            ProposedUnifiedDiff = string.Empty,
             RequiresHumanValidation = true,
             ReadyForExecution = false
         };

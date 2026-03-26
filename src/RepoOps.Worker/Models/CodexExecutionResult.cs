@@ -74,6 +74,8 @@ public sealed class CodexExecutionResponse
 
     public string ResponseText { get; init; } = string.Empty;
 
+    public string ProposedUnifiedDiff { get; init; } = string.Empty;
+
     public string Summary { get; init; } = string.Empty;
 
     public CodexResponseType ResponseType { get; init; } = CodexResponseType.Analysis;
@@ -95,6 +97,8 @@ public sealed class CodexExecutionDigest
 public sealed class CodexClientResponse
 {
     public string ResponseText { get; init; } = string.Empty;
+
+    public string ProposedUnifiedDiff { get; init; } = string.Empty;
 
     public string Summary { get; init; } = string.Empty;
 

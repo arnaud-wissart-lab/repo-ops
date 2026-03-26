@@ -73,6 +73,9 @@ Le premier jalon concret est un moteur de décisions non exécutant branché sur
 
 - conception documentée du superviseur IA ;
 - moteur de décisions structuré et digest dédié, sans exécution automatique ;
+- générateur de prompts structurés prêt à être utilisé manuellement ;
+- exécuteur contrôlé simulé et validation humaine explicite ;
+- `Commit Engine` en dry-run par défaut avec garde-fous stricts et mapping local explicite des workspaces ;
 - séparation explicite des rôles `planner`, `implementer`, `reviewer`, `QA` et `reporter` ;
 - gabarits de tâches standardisés ;
 - critères d’arrêt, de validation et de synthèse ;
@@ -88,5 +91,6 @@ Le premier jalon concret est un moteur de décisions non exécutant branché sur
 
 - l’extension future reste compatible avec les `AGENTS.md` des dépôts cibles ;
 - le dépôt sait déjà produire des décisions structurées et explicables à partir d’un rapport ;
+- le dépôt sait produire une chaîne complète `décision -> prompt -> réponse structurée -> validation humaine -> exécution Git contrôlée` sans automatisation implicite ;
 - la séparation des rôles et des critères d’arrêt est explicite ;
 - aucune automatisation non maîtrisée n’est introduite avant l’implémentation réelle.

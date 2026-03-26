@@ -1,0 +1,14 @@
+{
+  "repositories": [
+    {
+      "repository": "owner/repo-a",
+      "localPath": "C:/dev/repo-a",
+      "baseBranch": "main"
+    },
+    {
+      "repository": "owner/repo-b",
+      "localPath": "C:/dev/repo-b",
+      "baseBranch": "main"
+    }
+  ]
+}

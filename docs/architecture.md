@@ -28,6 +28,8 @@
    - digest des réponses superviseur texte
    - validations humaines JSON
    - digest des validations humaines texte
+   - exécutions Git contrôlées JSON
+   - digest des exécutions Git contrôlées texte
 5. `n8n` consomme le JSON renvoyé directement par le worker.
 6. `n8n` envoie l’email à partir du digest déjà produit.
 
@@ -161,6 +163,33 @@ Les décisions possibles sont :
 Le mode interactif affiche chaque action, son résumé et son niveau de confiance, puis demande une décision et un commentaire libre.
 Le mode non interactif charge un fichier de validation contenant les mêmes décisions.
 
+### Commit Engine
+
+Le `Commit Engine` se place après la validation humaine et reste soumis à des garde-fous stricts.
+
+Il :
+
+- consomme les validations humaines et les réponses structurées du client Codex ;
+- exige une action `Approved` avec `readyForExecution=true` ;
+- exige un patch unifié structuré dans la réponse associée ;
+- exige un mapping explicite `dépôt -> workspace local` ;
+- crée une branche dédiée ;
+- applique le patch ;
+- crée un commit ;
+- pousse la branche ;
+- peut ouvrir une pull request GitHub ;
+- reste en `dry-run` par défaut.
+
+Protections retenues :
+
+- aucun push direct vers `main` ou `master` ;
+- aucun déclenchement implicite depuis `n8n` ;
+- aucun commit sans validation humaine préalable ;
+- rollback local simple si l’échec survient avant la création du commit ;
+- logs détaillés et digest dédié.
+
+Dans l’état actuel, l’exécution réelle reste surtout une enveloppe sécurisée prête pour un futur client Codex capable de fournir un `proposedUnifiedDiff` exploitable.
+
 ### Aspire AppHost
 
 [`src/RepoOps.AppHost`](../src/RepoOps.AppHost) apporte une couche de pilotage local pour Visual Studio et le tableau de bord Aspire.
@@ -247,6 +276,7 @@ docker compose --profile maintenance run --rm renovate --version
 - fournir les artefacts consommés par `n8n`.
 - fournir des artefacts superviseur supplémentaires pour la relecture humaine, sans automatisation d’exécution.
 - porter la chaîne de validation humaine avant toute exécution future contrôlée.
+- porter le `Commit Engine` et ses garde-fous pour une exécution locale strictement contrôlée.
 
 ## Règles d’auto-merge retenues
 
@@ -301,6 +331,9 @@ Chaque override peut :
 - les réponses générées ne doivent pas être interprétées comme des ordres d’exécution ; elles restent des propositions à valider manuellement ;
 - la validation humaine reste locale au worker et n’est pas encore exposée dans `n8n` ;
 - `readyForExecution` est un état préparatoire uniquement ; aucun moteur d’exécution contrôlée n’est encore branché ;
+- le `Commit Engine` n’est pas appelé par `n8n` et reste un flux CLI explicite ;
+- le `Commit Engine` ne peut agir réellement que si la réponse structurée contient un `proposedUnifiedDiff` ;
+- le client `Stub` actuel ne produit pas de patch unifié, ce qui maintient les exécutions au niveau du dry-run ou du `skipped` contrôlé ;
 - l'intégration GitHub n'exploite pas encore les issues, les dépendances de sécurité ni l'historique détaillé d'exécution de Renovate ;
 - le flux quotidien n8n ne relance pas `Renovate` automatiquement ; il exploite le dernier résultat connu.
 
@@ -318,6 +351,7 @@ flowchart LR
     Worker --> Prompts["Prompts superviseur JSON + digest texte"]
     Worker --> CodexResponses["Réponses superviseur structurées JSON + digest texte"]
     Worker --> HumanValidation["Validations humaines JSON + digest texte"]
+    Worker --> CommitExecution["Exécutions Git contrôlées JSON + digest texte"]
     Worker -. exécution explicite .-> Renovate
     Worker --> RenovateArtifact["Artefact renovate-execution.json"]
     N8N --> Reports

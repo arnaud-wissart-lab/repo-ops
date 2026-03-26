@@ -92,6 +92,8 @@ Le dossier `scripts/` reste présent pour la transition, mais il ne fait plus pa
    - [`supervisor-codex-responses.txt`](./reports/supervisor-codex-responses.txt)
    - [`supervisor-validations.json`](./reports/supervisor-validations.json)
    - [`supervisor-validations.txt`](./reports/supervisor-validations.txt)
+   - [`supervisor-commit-executions.json`](./reports/supervisor-commit-executions.json)
+   - [`supervisor-commit-executions.txt`](./reports/supervisor-commit-executions.txt)
    - [`renovate-execution.json`](./reports/renovate-execution.json) lorsqu'une exécution explicite de `Renovate` est lancée via le worker
    Le worker interroge GitHub avec `GITHUB_TOKEN` pour récupérer les PR Renovate ouvertes, les PR Renovate fusionnées récemment, les fermetures sans fusion récentes, les checks utiles à la qualification opérationnelle, les `Dependabot alerts` ouvertes et corrigées quand elles sont disponibles, ainsi que les informations nécessaires à une décision d’auto-merge contrôlé.
 5. `n8n` lit le JSON renvoyé directement par l’API du worker.
@@ -312,6 +314,60 @@ Exemple de validation structurée :
 }
 ```
 
+## Commit Engine
+
+Le `Commit Engine` ajoute une première couche d’exécution contrôlée après validation humaine explicite.
+
+Principes retenus :
+
+- aucune exécution sans décision `Approved` et `readyForExecution=true` ;
+- aucun push direct vers `main` ou `master` ;
+- branche dédiée obligatoire pour chaque action ;
+- mode `dry-run` activé par défaut ;
+- aucun commit automatique tant qu’un patch unifié structuré n’est pas disponible dans la réponse associée ;
+- aucun workspace local n’est découvert automatiquement : un mapping dépôt -> chemin local doit être fourni explicitement.
+
+Sorties produites :
+
+- [`supervisor-commit-executions.json`](./reports/supervisor-commit-executions.json)
+- [`supervisor-commit-executions.txt`](./reports/supervisor-commit-executions.txt)
+
+Le moteur prend en entrée :
+
+- les validations humaines structurées ;
+- les réponses structurées du client Codex ;
+- un fichier de mapping local des workspaces.
+
+Exemple de mapping local :
+
+```json
+{
+  "repositories": [
+    {
+      "repository": "owner/repo-a",
+      "localPath": "C:/dev/repo-a",
+      "baseBranch": "main"
+    }
+  ]
+}
+```
+
+Exemple d’exécution en dry-run :
+
+```powershell
+dotnet run --project .\src\RepoOps.Worker -- --execute-validated --commit-validation-result-path=reports/supervisor-validations.json --commit-responses-path=reports/supervisor-codex-responses.json --commit-workspace-map-path=config/repository-workspaces.example.json --emit-json-to-stdout
+```
+
+Activation réelle, uniquement sur un dépôt pilote et après revue humaine :
+
+```powershell
+$env:COMMIT_ENGINE_ALLOW_REAL_EXECUTION="true"
+$env:COMMIT_ENGINE_DRY_RUN_ENABLED="false"
+dotnet run --project .\src\RepoOps.Worker -- --execute-validated --enable-real-commit-execution --commit-validation-result-path=reports/supervisor-validations.json --commit-responses-path=reports/supervisor-codex-responses.json --commit-workspace-map-path=config/repository-workspaces.json --emit-json-to-stdout
+```
+
+Le mode réel reste inutilisable tant qu’une réponse structurée ne contient pas `proposedUnifiedDiff`. Le client `Stub` actuel n’en produit pas. Cette étape doit donc être vue comme une enveloppe d’exécution contrôlée prête à être branchée sur un client plus riche, pas comme une automatisation autonome.
+
 ## Auto-merge contrôlé
 
 Le worker applique une politique simple et prudente :
@@ -401,6 +457,7 @@ docker compose --profile maintenance run --rm renovate --version
 - [`docs/architecture.md`](./docs/architecture.md) décrit les responsabilités et les flux.
 - [`docs/rollout-plan.md`](./docs/rollout-plan.md) découpe l’adoption en phases.
 - [`config/automerge.policies.example.json`](C:\Users\ArnaudW\source\repos\repo-ops\config\automerge.policies.example.json) montre le format d’override par dépôt.
+- [`config/repository-workspaces.example.json`](C:\Users\ArnaudW\source\repos\repo-ops\config\repository-workspaces.example.json) montre le format de mapping dépôt -> workspace local pour le `Commit Engine`.
 - [`n8n/README.md`](./n8n/README.md) décrit le rôle des workflows et leur import.
 - [`n8n/workflows/repo-ops-daily-maintenance.json`](./n8n/workflows/repo-ops-daily-maintenance.json) fournit le workflow quotidien importable.
 - [`tests/RepoOps.Worker.Tests`](C:\Users\ArnaudW\source\repos\repo-ops\tests\RepoOps.Worker.Tests) couvre la logique métier d’auto-merge.
@@ -485,6 +542,9 @@ Cette couche Aspire sert au pilotage local. Pour les exécutions réelles de la 
 - la configuration SMTP et les destinataires restent à finaliser manuellement dans `n8n` ;
 - le workflow quotidien exploite le dernier résultat connu de `Renovate`, mais ne le relance pas automatiquement ;
 - les sorties du superviseur et des prompts restent distinctes du rapport principal et ne sont pas encore consommées par `n8n`.
+- le `Commit Engine` reste en `dry-run` par défaut et exige un mapping explicite des workspaces locaux ;
+- le client `Stub` du `Codex Executor` ne produit pas encore de `proposedUnifiedDiff`, ce qui entraîne des opérations ignorées tant qu’un patch structuré n’est pas fourni ;
+- la création réelle de branche, de commit, de push et de pull request n’a de sens que sur un dépôt pilote explicitement déclaré dans le mapping local.
 
 ## Vérifications locales
 
@@ -509,6 +569,7 @@ dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --decide --repo
 dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --generate-prompts --decisions-path=reports/supervisor-decisions.json --emit-json-to-stdout
 dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --execute-prompts --prompts-path=reports/supervisor-prompts.json --emit-json-to-stdout
 dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --validate-responses --responses-path=reports/supervisor-codex-responses.json --validation-input-path=reports/supervisor-validations.json --emit-json-to-stdout
+dotnet .\src\RepoOps.Worker\bin\Debug\net10.0\RepoOps.Worker.dll --execute-validated --commit-validation-result-path=reports/supervisor-validations.json --commit-responses-path=reports/supervisor-codex-responses.json --commit-workspace-map-path=config/repository-workspaces.example.json --emit-json-to-stdout
 dotnet run --project .\src\RepoOps.Worker -- --run-once --run-renovate --emit-json-to-stdout --input-source=validation-renovate
 $env:AUTOMERGE_ENABLED="true"
 $env:AUTOMERGE_DRY_RUN_ENABLED="true"
@@ -719,6 +780,31 @@ Exemple de fichier de validation humaine :
       "decision": "NeedsReview",
       "comment": "Une revue fonctionnelle complémentaire reste nécessaire.",
       "timestampUtc": "2026-03-26T11:05:00Z"
+    }
+  ]
+}
+```
+
+Exemple de sortie du `Commit Engine` en dry-run :
+
+```json
+{
+  "dryRunEnabled": true,
+  "summary": {
+    "totalOperations": 1,
+    "successfulOperations": 0,
+    "failedOperations": 0,
+    "skippedOperations": 1,
+    "pullRequestsCreated": 0,
+    "dryRunOperations": 1
+  },
+  "operations": [
+    {
+      "actionId": "owner-repo-a-101-fix-required",
+      "repository": "owner/repo-a",
+      "branchName": "repo-ops/fix-pr-101",
+      "status": "Skipped",
+      "dryRun": true
     }
   ]
 }

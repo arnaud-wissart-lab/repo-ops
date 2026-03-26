@@ -27,6 +27,8 @@
 - Préserver la vocation du dépôt : orchestrer des dépôts tiers sans se substituer à leur logique applicative propre.
 - Repositionner explicitement comme transitoire tout script qui n’est plus la cible principale de l’architecture.
 - Préférer la production d’un contrat de sortie côté `.NET` plutôt qu’une logique métier reconstruite dans un workflow `n8n`.
+- Toute couche d’exécution contrôlée doit rester en `dry-run` par défaut et exiger des garde-fous explicites.
+- Ne jamais concevoir une exécution qui pousse directement sur `main` ou `master`.
 
 ## Documentation
 

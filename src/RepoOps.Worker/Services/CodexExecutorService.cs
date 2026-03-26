@@ -33,6 +33,7 @@ public sealed class CodexExecutorService(
                 PromptType = prompt.PromptType,
                 InitialPromptText = prompt.PromptText,
                 ResponseText = clientResponse.ResponseText,
+                ProposedUnifiedDiff = clientResponse.ProposedUnifiedDiff,
                 Summary = clientResponse.Summary,
                 ResponseType = clientResponse.ResponseType,
                 ConfidenceLevel = clientResponse.ConfidenceLevel,

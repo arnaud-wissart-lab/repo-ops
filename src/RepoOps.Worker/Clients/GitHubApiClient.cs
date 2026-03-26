@@ -70,6 +70,27 @@ public sealed class GitHubApiClient(
         return SendAsync<GitHubMergePullRequestResponseDto>(HttpMethod.Put, uri, payload, cancellationToken)!;
     }
 
+    public Task<GitHubCreatedPullRequestDto> CreatePullRequestAsync(
+        string owner,
+        string repository,
+        string title,
+        string body,
+        string head,
+        string @base,
+        CancellationToken cancellationToken)
+    {
+        var uri = $"repos/{owner}/{repository}/pulls";
+        var payload = new
+        {
+            title,
+            body,
+            head,
+            @base
+        };
+
+        return SendAsync<GitHubCreatedPullRequestDto>(HttpMethod.Post, uri, payload, cancellationToken)!;
+    }
+
     public async Task<IReadOnlyList<GitHubDependabotAlertDto>> GetDependabotAlertsAsync(
         string owner,
         string repository,

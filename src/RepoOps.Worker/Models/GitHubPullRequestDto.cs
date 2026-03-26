@@ -80,6 +80,13 @@ public sealed class GitHubMergePullRequestResponseDto
     public string Sha { get; init; } = string.Empty;
 }
 
+public sealed class GitHubCreatedPullRequestDto
+{
+    public int Number { get; init; }
+
+    public string HtmlUrl { get; init; } = string.Empty;
+}
+
 public sealed class GitHubApiErrorDto
 {
     public string Message { get; init; } = string.Empty;

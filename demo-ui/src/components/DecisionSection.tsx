@@ -68,7 +68,7 @@ export function DecisionSection({ actions }: DecisionSectionProps) {
           {actions.map((action) => (
             <article
               key={`${action.repository}-${action.pullRequestNumber ?? "repo"}-${action.type}`}
-              className="decision-card"
+              className={`decision-card decision-card-${typeMeta(action.type).tone}`}
             >
               <div className="decision-topline">
                 <div>
@@ -87,15 +87,18 @@ export function DecisionSection({ actions }: DecisionSectionProps) {
                     {action.pullRequestNumber ? `PR #${action.pullRequestNumber}` : action.repository}{" "}
                     — {typeMeta(action.type).label.toUpperCase()}
                   </h3>
+                  <p className="decision-title-caption">
+                    {action.pullRequestTitle ?? "Action structurée au niveau dépôt"}
+                  </p>
                 </div>
                 <StatusPill label={action.priority} tone={toneFromPriority(action.priority)} />
               </div>
 
               <div className="decision-meta">
-                <span>{action.repository}</span>
+                <span>Cible : {action.repository}</span>
                 {action.pullRequestNumber ? <span>PR #{action.pullRequestNumber}</span> : null}
                 {action.checksStatus ? <span>Checks : {action.checksStatus}</span> : null}
-                <span>Statut : {typeMeta(action.type).label}</span>
+                <span>Type : {typeMeta(action.type).label}</span>
               </div>
 
               <div className="decision-section-block">

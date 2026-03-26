@@ -40,8 +40,11 @@ export function DeveloperPanel({ logs, run }: DeveloperPanelProps) {
       <div className="panel-header">
         <div>
           <p className="section-kicker">Panneau développeur</p>
-          <h2>Logs et JSON brut</h2>
-          <p className="subtle-text">Sortie technique brute prête pour inspection ou copie.</p>
+          <h2>Sortie technique (mode développeur)</h2>
+          <p className="subtle-text">
+            Logs structurés et JSON brut prêts pour inspection, copie et
+            démonstration technique.
+          </p>
         </div>
         <div className="tab-bar">
           <button
@@ -64,6 +67,7 @@ export function DeveloperPanel({ logs, run }: DeveloperPanelProps) {
       {activeTab === "logs" ? (
         <>
           <div className="developer-toolbar">
+            <span className="developer-toolbar-label">Trace d’exécution</span>
             <label className="toggle-option">
               <input
                 type="checkbox"
@@ -94,11 +98,11 @@ export function DeveloperPanel({ logs, run }: DeveloperPanelProps) {
             <span>Sortie technique brute</span>
             <button
               type="button"
-              className="secondary-button"
+              className="secondary-button json-copy-button"
               onClick={() => void copyJson()}
               disabled={!run}
             >
-              {copied ? "JSON copié" : "Copier"}
+              {copied ? "JSON copié" : "Copier le JSON"}
             </button>
           </div>
           <div className="json-editor">

@@ -3,6 +3,7 @@ import type {
   MaintenanceRunReport,
   SupervisorDecisionResult,
 } from "../types";
+import { detectScenarioLabel } from "../utils";
 import { StatusPill } from "./StatusPill";
 
 interface NarrativeSummaryProps {
@@ -25,38 +26,27 @@ function statusTone(status: string): "done" | "warning" | "failed" {
   return "failed";
 }
 
-function detectScenario(report: MaintenanceRunReport, decisions: SupervisorDecisionResult): string {
-  const failedChecks = report.pullRequestStatuses.failedChecks.length;
-  const criticalVulnerabilities = report.vulnerabilities.criticalCount;
-  const securityReview = decisions.actions.find((action) => action.isSecurityRelated);
-  const readyForMerge = report.autoMerge.readyForMerge.length;
-
-  if (criticalVulnerabilities > 0 && securityReview) {
-    return "Mise à jour de dépendance avec vulnérabilité critique à traiter en priorité";
-  }
-
-  if (failedChecks > 0) {
-    return "Mise à jour de dépendance avec build cassé et correction ciblée attendue";
-  }
-
-  if (readyForMerge > 0) {
-    return "Patch de dépendance prêt pour validation finale avant auto-merge contrôlé";
-  }
-
-  return "Cycle de maintenance standard avec tri des PR et préparation des actions";
-}
-
 export function NarrativeSummary({
   report,
   decisions,
   codex,
 }: NarrativeSummaryProps) {
   const analyzed = report.observability?.metrics.analyzedPullRequests ?? 0;
-  const failed = report.summary.counts.failedPullRequests;
-  const fixes = decisions.summary.fixRequiredActions;
-  const validations = codex.summary.requiresHumanValidationResponses;
+  const anomalies =
+    report.observability?.metrics.errorCount ?? report.summary.counts.failedPullRequests;
+  const fixes =
+    codex.summary.proposedFixResponses > 0
+      ? codex.summary.proposedFixResponses
+      : decisions.summary.fixRequiredActions;
   const vulnerabilities = report.vulnerabilities.openAlerts;
   const action = report.recommendations.manualActions[0] ?? "Relire les décisions prioritaires avant tout passage en mode réel.";
+  const securityReview = decisions.actions.some((decision) => decision.isSecurityRelated);
+  const scenario = detectScenarioLabel(
+    report.pullRequestStatuses.failedChecks.length,
+    report.vulnerabilities.criticalCount,
+    securityReview,
+    report.autoMerge.readyForMerge.length,
+  );
 
   return (
     <section className="panel narrative-panel panel-reveal">
@@ -71,32 +61,37 @@ export function NarrativeSummary({
       <div className="narrative-grid">
         <article className="narrative-card narrative-card-primary">
           <p className="narrative-eyebrow">Analyse terminée</p>
-          <h3>{report.digest.subject}</h3>
+          <h3>Ce que le système a fait</h3>
           <ul className="narrative-list">
             <li>{analyzed} Pull Request{analyzed > 1 ? "s" : ""} analysée{analyzed > 1 ? "s" : ""}</li>
-            <li>{failed} échec{failed > 1 ? "s" : ""} détecté{failed > 1 ? "s" : ""}</li>
+            <li>{anomalies} anomalie{anomalies > 1 ? "s" : ""} détectée{anomalies > 1 ? "s" : ""}</li>
             <li>{fixes} correction{fixes > 1 ? "s" : ""} proposée{fixes > 1 ? "s" : ""} par IA</li>
-            <li>{validations} validation{validations > 1 ? "s" : ""} humaine{validations > 1 ? "s" : ""} encore requise{validations > 1 ? "s" : ""}</li>
             <li>{vulnerabilities} vulnérabilité{vulnerabilities > 1 ? "s" : ""} détectée{vulnerabilities > 1 ? "s" : ""}</li>
+          </ul>
+          <div className="narrative-action-callout">
+            <span>Action recommandée</span>
+            <strong>{action}</strong>
+          </div>
+        </article>
+
+        <article className="narrative-card">
+          <p className="narrative-eyebrow">Scénario</p>
+          <h3>{scenario}</h3>
+          <ul className="detail-list compact-list narrative-detail-list">
+            <li>{report.summary.counts.failedPullRequests} PR en échec à traiter</li>
+            <li>{report.autoMerge.readyForMerge.length} PR prête{report.autoMerge.readyForMerge.length > 1 ? "s" : ""} pour validation finale</li>
+            <li>{decisions.summary.highPriorityActions} action{decisions.summary.highPriorityActions > 1 ? "s" : ""} prioritaire{decisions.summary.highPriorityActions > 1 ? "s" : ""}</li>
           </ul>
         </article>
 
         <article className="narrative-card">
-          <p className="narrative-eyebrow">Contexte du run</p>
-          <h3>{detectScenario(report, decisions)}</h3>
-          <p className="subtle-text">
-            Le scénario affiché ci-dessus aide à comprendre rapidement pourquoi
-            les décisions ont été prises, sans devoir lire tous les détails.
-          </p>
-        </article>
-
-        <article className="narrative-card">
-          <p className="narrative-eyebrow">Action recommandée</p>
-          <h3>{action}</h3>
-          <p className="subtle-text">
-            Cette recommandation correspond au prochain geste utile pour un
-            responsable technique ou un recruteur en lecture guidée.
-          </p>
+          <p className="narrative-eyebrow">Lecture rapide</p>
+          <h3>{report.digest.subject}</h3>
+          <ul className="detail-list compact-list narrative-detail-list">
+            <li>{decisions.summary.totalActions} décision{decisions.summary.totalActions > 1 ? "s" : ""} structurée{decisions.summary.totalActions > 1 ? "s" : ""}</li>
+            <li>{codex.summary.totalResponses} réponse{codex.summary.totalResponses > 1 ? "s" : ""} générée{codex.summary.totalResponses > 1 ? "s" : ""}</li>
+            <li>{codex.summary.requiresHumanValidationResponses} validation{codex.summary.requiresHumanValidationResponses > 1 ? "s" : ""} humaine{codex.summary.requiresHumanValidationResponses > 1 ? "s" : ""} requise{codex.summary.requiresHumanValidationResponses > 1 ? "s" : ""}</li>
+          </ul>
         </article>
       </div>
     </section>

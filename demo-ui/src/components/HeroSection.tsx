@@ -76,6 +76,9 @@ export function HeroSection({
               {isLoading ? <span className="button-spinner" aria-hidden="true" /> : null}
               <span>{isLoading ? "Analyse en cours..." : "Lancer une analyse"}</span>
             </span>
+            <span className="primary-button-subtitle">
+              {isLoading ? "Pipeline en exécution" : "Déclenchement principal"}
+            </span>
           </button>
           <button
             type="button"

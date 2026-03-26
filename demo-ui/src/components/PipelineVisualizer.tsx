@@ -24,9 +24,20 @@ export function PipelineVisualizer({ steps }: PipelineVisualizerProps) {
       : allDone
         ? "Analyse terminée avec succès"
         : "Pipeline prêt à s’exécuter";
+  const completionNote = hasFailure
+    ? "Un point bloquant a été détecté et documenté dans le run."
+    : hasWarning
+      ? "Le run est terminé, avec des décisions à relire avant toute suite."
+      : allDone
+        ? "Le pipeline s’est déroulé complètement et la synthèse est prête."
+        : "Le système attend un déclenchement pour dérouler le run complet.";
 
   return (
-    <section className={`panel panel-reveal ${allDone ? "pipeline-panel-complete" : ""}`}>
+    <section
+      className={`panel panel-reveal ${
+        allDone || hasWarning || hasFailure ? "pipeline-panel-complete" : ""
+      }`}
+    >
       <div className="panel-header">
         <div>
           <p className="section-kicker">Pipeline</p>
@@ -57,9 +68,16 @@ export function PipelineVisualizer({ steps }: PipelineVisualizerProps) {
         ))}
       </div>
 
-      <div className={`pipeline-completion pipeline-completion-${hasFailure ? "failed" : hasWarning ? "warning" : allDone ? "done" : "idle"}`}>
+      <div
+        className={`pipeline-completion pipeline-completion-${
+          hasFailure ? "failed" : hasWarning ? "warning" : allDone ? "done" : "idle"
+        }`}
+      >
         <span className="pipeline-completion-dot" />
-        <span>{completionLabel}</span>
+        <div className="pipeline-completion-copy">
+          <strong>{completionLabel}</strong>
+          <span>{completionNote}</span>
+        </div>
       </div>
     </section>
   );

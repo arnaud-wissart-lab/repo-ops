@@ -29,7 +29,13 @@ import type {
   PipelineStepState,
   UiStatus,
 } from "./types";
-import { createDerivedLogEntries, createLogEntry, formatDateTime } from "./utils";
+import {
+  createDerivedLogEntries,
+  createLogEntry,
+  detectScenarioLabel,
+  formatDuration,
+  formatRelativeTime,
+} from "./utils";
 
 const configuredMode = getConfiguredDemoMode();
 
@@ -324,6 +330,15 @@ export default function App() {
     0;
 
   const proposedActions = decisions?.summary.totalActions ?? 0;
+  const scenarioLabel = report
+    ? detectScenarioLabel(
+        report.pullRequestStatuses.failedChecks.length,
+        report.vulnerabilities.criticalCount,
+        decisions?.actions.some((action) => action.isSecurityRelated) ?? false,
+        report.autoMerge.readyForMerge.length,
+        run?.source === "mock",
+      )
+    : "Scénario de démonstration prêt à être lancé";
 
   return (
     <div className="app-shell">
@@ -359,10 +374,16 @@ export default function App() {
             />
             {error ? <p className="error-text">{error}</p> : null}
             {report ? (
-              <p className="subtle-text">
-                Dernier run : {formatDateTime(report.summary.runDateUtc)} · source{" "}
-                {run?.source === "mock" ? "mock" : "API"}
-              </p>
+              <div className="run-context-inline">
+                <p className="subtle-text">
+                  Dernière exécution : {formatRelativeTime(report.summary.runDateUtc)} · durée{" "}
+                  {formatDuration(report.observability?.durationMilliseconds)}
+                </p>
+                <p className="subtle-text">
+                  Mode : démonstration / dry-run · source {run?.source === "mock" ? "mock" : "API"}
+                </p>
+                <p className="run-scenario-text">Scénario : {scenarioLabel}</p>
+              </div>
             ) : (
               <p className="subtle-text">
                 Lancez un scénario API ou chargez un exemple pour explorer le

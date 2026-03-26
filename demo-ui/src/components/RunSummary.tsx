@@ -3,7 +3,7 @@ import type {
   MaintenanceRunReport,
   SupervisorDecisionResult,
 } from "../types";
-import { formatDateTime } from "../utils";
+import { detectScenarioLabel, formatDateTime, formatDuration, formatRelativeTime } from "../utils";
 import { StatusPill } from "./StatusPill";
 
 interface RunSummaryProps {
@@ -27,6 +27,13 @@ function statusTone(status: string): "done" | "warning" | "failed" {
 }
 
 export function RunSummary({ report, decisions, codex }: RunSummaryProps) {
+  const scenario = detectScenarioLabel(
+    report.pullRequestStatuses.failedChecks.length,
+    report.vulnerabilities.criticalCount,
+    decisions.actions.some((action) => action.isSecurityRelated),
+    report.autoMerge.readyForMerge.length,
+  );
+
   return (
     <section className="panel panel-reveal">
       <div className="panel-header">
@@ -35,6 +42,25 @@ export function RunSummary({ report, decisions, codex }: RunSummaryProps) {
           <h2>Résumé exécutif du run</h2>
         </div>
         <StatusPill label={report.summary.status} tone={statusTone(report.summary.status)} />
+      </div>
+
+      <div className="run-context-banner">
+        <div>
+          <span>Scénario</span>
+          <strong>{scenario}</strong>
+        </div>
+        <div>
+          <span>Dernière exécution</span>
+          <strong>{formatRelativeTime(report.summary.runDateUtc)}</strong>
+        </div>
+        <div>
+          <span>Durée</span>
+          <strong>{formatDuration(report.observability?.durationMilliseconds)}</strong>
+        </div>
+        <div>
+          <span>Mode</span>
+          <strong>Démonstration / dry-run</strong>
+        </div>
       </div>
 
       <div className="summary-grid">

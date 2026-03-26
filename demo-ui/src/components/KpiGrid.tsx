@@ -7,11 +7,11 @@ interface KpiGridProps {
 }
 
 const items = [
-  { key: "analyzed", label: "PR analysées", icon: "✓", tone: "neutral" },
-  { key: "ready", label: "PR prêtes", icon: "→", tone: "done" },
-  { key: "blocked", label: "PR bloquées", icon: "!", tone: "warning" },
-  { key: "vulnerabilities", label: "Vulnérabilités", icon: "🛡", tone: "failed" },
-  { key: "actions", label: "Actions proposées", icon: "IA", tone: "info" },
+  { key: "analyzed", label: "PR analysées", icon: "✓", accent: "Vue d’ensemble", tone: "neutral" },
+  { key: "ready", label: "PR prêtes", icon: "→", accent: "Prêtes à traiter", tone: "done" },
+  { key: "blocked", label: "PR bloquées", icon: "!", accent: "Points d’attention", tone: "warning" },
+  { key: "vulnerabilities", label: "Vulnérabilités", icon: "🛡", accent: "Risque sécurité", tone: "failed" },
+  { key: "actions", label: "Actions proposées", icon: "IA", accent: "Sortie superviseur", tone: "info" },
 ] as const;
 
 export function KpiGrid({
@@ -35,7 +35,10 @@ export function KpiGrid({
         <article key={item.key} className={`kpi-card kpi-card-${item.tone}`}>
           <div className="kpi-topline">
             <span className="kpi-icon">{item.icon}</span>
-            <p>{item.label}</p>
+            <div className="kpi-copy">
+              <p>{item.label}</p>
+              <span>{item.accent}</span>
+            </div>
           </div>
           <strong>{values[item.key]}</strong>
           <span className="kpi-caption">Lecture instantanée du run</span>

@@ -168,6 +168,19 @@ require_cmd docker
 require_cmd curl
 require_cmd base64
 
+ensure_env_key() {
+  local file_path="$1"
+  local key="$2"
+  local value="$3"
+
+  if grep -qE "^${key}=" "$file_path"; then
+    return
+  fi
+
+  printf '\n%s=%s\n' "$key" "$value" >> "$file_path"
+  log "Variable ${key} absente du .env, valeur par défaut ajoutée: ${value}"
+}
+
 log "Script distant initialisé."
 debug "Contexte distant: ref=${DEPLOY_REF}, repo=${REPO_SLUG}, app_dir=${APP_DIR}."
 
@@ -233,6 +246,8 @@ if [ ! -f "$ENV_FILE_PATH" ]; then
   chmod 600 "$ENV_FILE_PATH"
   log "Fichier .env créé depuis .env.example. Personnaliser les secrets avant un déploiement réel."
 fi
+
+ensure_env_key "$ENV_FILE_PATH" "DEMO_UI_PORT" "8084"
 
 log "Validation de la configuration Compose"
 "${compose_cmd[@]}" --env-file "$ENV_FILE_PATH" -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE_PATH" config >/dev/null

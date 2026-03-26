@@ -64,6 +64,11 @@ Si `.env` est absent :
 - le script le crée depuis `.env.example`
 - il faut ensuite personnaliser les secrets avant un déploiement réellement exploitable
 
+Si `.env` existe déjà mais ne contient pas `DEMO_UI_PORT` :
+
+- le script ajoute automatiquement `DEMO_UI_PORT=8084`
+- cela évite les publications Docker sur port aléatoire lors des mises à jour d’un ancien environnement
+
 ## Démarrage manuel home hors workflow
 
 ```bash

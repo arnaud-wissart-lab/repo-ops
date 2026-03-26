@@ -1,0 +1,276 @@
+:root {
+  color-scheme: light;
+  font-family:
+    "Segoe UI", "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background:
+    radial-gradient(circle at top left, #e4f3ff 0, transparent 35%),
+    linear-gradient(180deg, #f5f9fc 0%, #eef3f7 100%);
+  color: #152132;
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+button {
+  font: inherit;
+}
+
+a {
+  color: #0b61c2;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.page-shell {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 32px 20px 56px;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
+  padding: 28px;
+  border: 1px solid rgba(18, 33, 50, 0.08);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 18px 40px rgba(23, 32, 51, 0.08);
+}
+
+.hero h1,
+.section-header h2,
+.card h2,
+.card h3 {
+  margin: 0;
+}
+
+.hero-description,
+.muted,
+.hint {
+  color: #4e6078;
+}
+
+.hero-actions {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
+}
+
+.primary-button,
+.secondary-button {
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    opacity 120ms ease;
+}
+
+.primary-button {
+  padding: 14px 20px;
+  background: linear-gradient(135deg, #0d6efd 0%, #0c8ce9 100%);
+  color: white;
+  box-shadow: 0 14px 28px rgba(13, 110, 253, 0.24);
+}
+
+.secondary-button {
+  padding: 10px 14px;
+  background: #e8f0f8;
+  color: #17335b;
+}
+
+.primary-button:hover,
+.secondary-button:hover {
+  transform: translateY(-1px);
+}
+
+.primary-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: #0b61c2;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.grid {
+  display: grid;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.two-columns {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.card {
+  padding: 22px;
+  border: 1px solid rgba(18, 33, 50, 0.08);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 14px 30px rgba(17, 28, 43, 0.06);
+}
+
+.card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metrics-grid.compact {
+  margin-bottom: 16px;
+}
+
+.metric {
+  padding: 14px;
+  border-radius: 16px;
+  background: #f4f8fb;
+  border: 1px solid rgba(18, 33, 50, 0.06);
+}
+
+.metric span,
+.security-grid span {
+  display: block;
+  color: #5a6b82;
+  font-size: 0.88rem;
+}
+
+.metric strong,
+.security-grid strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 1.2rem;
+}
+
+.security-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.badge-success {
+  background: #dff7e4;
+  color: #126031;
+}
+
+.badge-warning {
+  background: #fff4d9;
+  color: #8a5b00;
+}
+
+.badge-error {
+  background: #fde4e8;
+  color: #9d1736;
+}
+
+.badge-neutral {
+  background: #e7eef6;
+  color: #294667;
+}
+
+.status-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.stack {
+  display: grid;
+  gap: 14px;
+}
+
+.decision-card,
+.prompt-card {
+  padding: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f7fafc 100%);
+}
+
+.prompt-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+  color: #3f536c;
+  font-size: 0.9rem;
+}
+
+pre {
+  overflow: auto;
+  margin: 0 0 14px;
+  padding: 14px;
+  border-radius: 14px;
+  background: #0f1724;
+  color: #e6edf7;
+  font-family:
+    "Cascadia Code", "Consolas", "SFMono-Regular", ui-monospace, monospace;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+}
+
+.section-header {
+  margin-top: 32px;
+}
+
+.error-text {
+  color: #a11d39;
+  font-weight: 600;
+}
+
+ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+@media (max-width: 960px) {
+  .hero,
+  .two-columns,
+  .metrics-grid,
+  .security-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .page-shell {
+    padding: 20px 16px 40px;
+  }
+}

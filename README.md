@@ -87,6 +87,25 @@ Les métriques actuellement suivies sont :
 - nombre de PR bloquées ;
 - nombre d’erreurs détectées côté exécution.
 
+### UI de démonstration
+
+Le dépôt inclut aussi une interface web de démonstration en `React + Vite + TypeScript` dans [`demo-ui`](./demo-ui).
+
+Cette UI permet de :
+
+- lancer un run sec ;
+- afficher le résumé global ;
+- visualiser les décisions du superviseur ;
+- consulter les prompts générés ;
+- rappeler explicitement les garde-fous de sécurité.
+
+Elle reste volontairement en mode démonstration :
+
+- aucun commit ;
+- aucun push ;
+- aucune pull request créée ;
+- aucune action irréversible.
+
 ### Scripts transitoires
 
 Le dossier `scripts/` reste présent pour la transition, mais il ne fait plus partie du flux réel retenu. Les scripts servent encore à des vérifications locales ou à un secours ponctuel, pas à la logique métier principale.
@@ -540,6 +559,7 @@ docker compose --profile maintenance run --rm renovate --version
 - [`src/RepoOps.AppHost`](./src/RepoOps.AppHost) contient l’AppHost Aspire pour le pilotage local.
 - [`src/RepoOps.Worker`](./src/RepoOps.Worker) contient le Worker Service `.NET`.
 - [`docker-compose.yml`](./docker-compose.yml) décrit la stack locale réellement exécutée.
+- [`demo-ui`](./demo-ui) contient l’interface web de démonstration.
 - [`.env.example`](./.env.example) centralise les variables attendues.
 - [`AGENTS.md`](./AGENTS.md) fixe les règles de travail pour les contributions futures.
 - [`renovate/config.js`](./renovate/config.js) porte la configuration self-hosted d’administration.
@@ -606,6 +626,25 @@ dotnet user-secrets --project .\src\RepoOps.AppHost set GITHUB_TOKEN "ghp_votre_
 ```
 
 Cette couche Aspire sert au pilotage local. Pour les exécutions réelles de la stack, conserver `docker compose`.
+
+## Démonstration web
+
+L’interface de démonstration vit dans [`demo-ui`](./demo-ui) et utilise un proxy Vite vers le worker local.
+
+Lancement :
+
+```powershell
+dotnet run --project .\src\RepoOps.Worker
+cd .\demo-ui
+npm install
+npm run dev
+```
+
+L’URL de développement est généralement :
+
+```text
+http://127.0.0.1:5173
+```
 
 ## Limites actuelles
 

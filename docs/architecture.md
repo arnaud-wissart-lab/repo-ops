@@ -49,6 +49,17 @@ Par défaut :
 
 `Renovate` est conservé dans le même fichier, mais derrière un profil explicite de maintenance.
 
+### UI de démonstration
+
+Une interface web légère en `React + Vite + TypeScript` complète désormais le dépôt dans [`demo-ui`](../demo-ui).
+
+Elle :
+
+- appelle les endpoints HTTP existants du worker ;
+- reste en mode démonstration ;
+- n’exécute aucune opération Git ;
+- ne remplace ni `n8n`, ni les flux CLI avancés.
+
 ### Worker .NET
 
 [`src/RepoOps.Worker`](../src/RepoOps.Worker) porte la logique métier :
@@ -347,6 +358,13 @@ Chaque override peut :
 - l’envoi de l’email ;
 - la configuration manuelle des credentials SMTP.
 
+### Ce qui relève de l’UI de démonstration
+
+- lancer un run sec depuis une page web ;
+- afficher les résultats consolidés ;
+- visualiser les décisions et les prompts ;
+- illustrer le comportement du système sans exposer de risque.
+
 ## Limites actuelles
 
 - la collecte GitHub reste limitée au périmètre REST minimal utile à ce lot ;
@@ -370,6 +388,7 @@ Chaque override peut :
 - le client `Stub` actuel ne produit pas de patch unifié, ce qui maintient les exécutions au niveau du dry-run ou du `skipped` contrôlé ;
 - la validation avant commit reste volontairement simple et repose principalement sur `dotnet build` quand un dépôt `.NET` est détecté ;
 - l’observabilité reste locale et n’expose pas encore de vue agrégée plus riche que l’historique JSON et la consultation CLI ;
+- l’UI de démonstration est un client local pour présentation et tests manuels ; elle ne constitue pas un portail d’administration complet ;
 - l'intégration GitHub n'exploite pas encore les issues, les dépendances de sécurité ni l'historique détaillé d'exécution de Renovate ;
 - le flux quotidien n8n ne relance pas `Renovate` automatiquement ; il exploite le dernier résultat connu.
 

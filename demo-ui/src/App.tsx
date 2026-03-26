@@ -8,10 +8,13 @@ import {
   runMaintenanceReport,
 } from "./api";
 import { DecisionSection } from "./components/DecisionSection";
+import { DemoModeBadge } from "./components/DemoModeBadge";
 import { DeveloperPanel } from "./components/DeveloperPanel";
+import { EmptyStatePanel } from "./components/EmptyStatePanel";
 import { GlobalStatusBanner } from "./components/GlobalStatusBanner";
 import { HeroSection } from "./components/HeroSection";
 import { KpiGrid } from "./components/KpiGrid";
+import { NarrativeSummary } from "./components/NarrativeSummary";
 import { PipelineVisualizer } from "./components/PipelineVisualizer";
 import { PromptSection } from "./components/PromptSection";
 import { RunSummary } from "./components/RunSummary";
@@ -326,6 +329,7 @@ export default function App() {
     <div className="app-shell">
       <div className="ambient ambient-left" />
       <div className="ambient ambient-right" />
+      <DemoModeBadge />
 
       <main className="layout">
         <HeroSection
@@ -382,6 +386,12 @@ export default function App() {
 
         {report ? <GlobalStatusBanner report={report} /> : null}
 
+        {report && decisions && codex ? (
+          <NarrativeSummary report={report} decisions={decisions} codex={codex} />
+        ) : (
+          <EmptyStatePanel />
+        )}
+
         <PipelineVisualizer steps={toPipelineSteps(pipelineStates)} />
 
         <KpiGrid
@@ -398,7 +408,7 @@ export default function App() {
             {report && decisions && codex ? (
               <RunSummary report={report} decisions={decisions} codex={codex} />
             ) : (
-              <section className="panel">
+              <section className="panel panel-reveal">
                 <div className="panel-header">
                   <div>
                     <p className="section-kicker">Synthèse</p>
@@ -408,7 +418,7 @@ export default function App() {
                 <p className="empty-state">
                   Lancez une analyse ou chargez un exemple pour afficher la
                   synthèse consolidée, les messages importants et les réponses
-                  proposées.
+                  proposées, ainsi que la narration du run.
                 </p>
               </section>
             )}

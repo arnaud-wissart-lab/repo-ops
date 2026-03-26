@@ -28,7 +28,7 @@ function statusTone(status: string): "done" | "warning" | "failed" {
 
 export function RunSummary({ report, decisions, codex }: RunSummaryProps) {
   return (
-    <section className="panel">
+    <section className="panel panel-reveal">
       <div className="panel-header">
         <div>
           <p className="section-kicker">Synthèse</p>
@@ -39,7 +39,7 @@ export function RunSummary({ report, decisions, codex }: RunSummaryProps) {
 
       <div className="summary-grid">
         <article className="summary-card">
-          <h3>Résultat métier</h3>
+          <h3>Résultat métier immédiat</h3>
           <p className="summary-lead">{report.digest.subject}</p>
           <p className="subtle-text">
             Run du {formatDateTime(report.summary.runDateUtc)} via{" "}
@@ -61,7 +61,7 @@ export function RunSummary({ report, decisions, codex }: RunSummaryProps) {
         </article>
 
         <article className="summary-card">
-          <h3>Sécurité et exécution</h3>
+          <h3>Lecture rapide</h3>
           <div className="summary-stats">
             <div>
               <span>Sécurité</span>
@@ -83,7 +83,7 @@ export function RunSummary({ report, decisions, codex }: RunSummaryProps) {
         </article>
 
         <article className="summary-card">
-          <h3>Réponses proposées</h3>
+          <h3>Réponses proposées par le système</h3>
           <ul className="detail-list">
             {codex.responses.length === 0 ? (
               <li>Aucune réponse structurée disponible.</li>

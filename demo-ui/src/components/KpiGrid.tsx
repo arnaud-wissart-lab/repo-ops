@@ -7,11 +7,11 @@ interface KpiGridProps {
 }
 
 const items = [
-  { key: "analyzed", label: "PR analysées", icon: "PR", tone: "neutral" },
-  { key: "ready", label: "PR prêtes", icon: "OK", tone: "done" },
-  { key: "blocked", label: "PR bloquées", icon: "BL", tone: "warning" },
-  { key: "vulnerabilities", label: "Vulnérabilités", icon: "SEC", tone: "failed" },
-  { key: "actions", label: "Actions proposées", icon: "ACT", tone: "info" },
+  { key: "analyzed", label: "PR analysées", icon: "✓", tone: "neutral" },
+  { key: "ready", label: "PR prêtes", icon: "→", tone: "done" },
+  { key: "blocked", label: "PR bloquées", icon: "!", tone: "warning" },
+  { key: "vulnerabilities", label: "Vulnérabilités", icon: "🛡", tone: "failed" },
+  { key: "actions", label: "Actions proposées", icon: "IA", tone: "info" },
 ] as const;
 
 export function KpiGrid({

@@ -47,11 +47,11 @@ function toneFromPriority(priority: string): "done" | "warning" | "failed" | "ne
 
 export function DecisionSection({ actions }: DecisionSectionProps) {
   return (
-    <section className="panel">
+    <section className="panel panel-reveal">
       <div className="panel-header">
         <div>
           <p className="section-kicker">Décisions</p>
-          <h2>Actions structurées</h2>
+          <h2>Pourquoi ces décisions</h2>
         </div>
         <p className="subtle-text">
           Le moteur de décision reste explicable. Rien n’est exécuté depuis
@@ -83,7 +83,10 @@ export function DecisionSection({ actions }: DecisionSectionProps) {
                       </span>
                     ) : null}
                   </div>
-                  <h3>{action.pullRequestTitle || action.repository}</h3>
+                  <h3>
+                    {action.pullRequestNumber ? `PR #${action.pullRequestNumber}` : action.repository}{" "}
+                    — {typeMeta(action.type).label.toUpperCase()}
+                  </h3>
                 </div>
                 <StatusPill label={action.priority} tone={toneFromPriority(action.priority)} />
               </div>
@@ -95,12 +98,20 @@ export function DecisionSection({ actions }: DecisionSectionProps) {
                 <span>Statut : {typeMeta(action.type).label}</span>
               </div>
 
-              <p>{action.reason}</p>
+              <div className="decision-section-block">
+                <p className="decision-section-title">Raison</p>
+                <ul className="detail-list compact-list">
+                  <li>{action.reason}</li>
+                </ul>
+              </div>
 
               {action.recommendation ? (
-                <p className="recommendation-text">
-                  Recommandation : {action.recommendation}
-                </p>
+                <div className="decision-section-block">
+                  <p className="decision-section-title">Action suggérée</p>
+                  <ul className="detail-list compact-list">
+                    <li className="recommendation-text">{action.recommendation}</li>
+                  </ul>
+                </div>
               ) : null}
 
               {action.pullRequestUrl ? (

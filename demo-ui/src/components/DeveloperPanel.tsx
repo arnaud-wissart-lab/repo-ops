@@ -14,6 +14,8 @@ export function DeveloperPanel({ logs, run }: DeveloperPanelProps) {
   const [copied, setCopied] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
   const consoleRef = useRef<HTMLDivElement | null>(null);
+  const jsonContent = run ? toPrettyJson(run) : "Aucun JSON à afficher.";
+  const jsonLines = jsonContent.split("\n");
 
   useEffect(() => {
     if (!autoScroll || activeTab !== "logs" || !consoleRef.current) {
@@ -34,11 +36,12 @@ export function DeveloperPanel({ logs, run }: DeveloperPanelProps) {
   }
 
   return (
-    <section className="panel developer-panel">
+    <section className="panel developer-panel panel-reveal">
       <div className="panel-header">
         <div>
           <p className="section-kicker">Panneau développeur</p>
           <h2>Logs et JSON brut</h2>
+          <p className="subtle-text">Sortie technique brute prête pour inspection ou copie.</p>
         </div>
         <div className="tab-bar">
           <button
@@ -88,7 +91,7 @@ export function DeveloperPanel({ logs, run }: DeveloperPanelProps) {
       ) : (
         <div className="json-panel">
           <div className="json-toolbar">
-            <span>Payload complet du scénario</span>
+            <span>Sortie technique brute</span>
             <button
               type="button"
               className="secondary-button"
@@ -98,7 +101,14 @@ export function DeveloperPanel({ logs, run }: DeveloperPanelProps) {
               {copied ? "JSON copié" : "Copier"}
             </button>
           </div>
-          <pre>{run ? toPrettyJson(run) : "Aucun JSON à afficher."}</pre>
+          <div className="json-editor">
+            <div className="json-editor-gutter">
+              {jsonLines.map((_, index) => (
+                <span key={`line-${index + 1}`}>{index + 1}</span>
+              ))}
+            </div>
+            <pre className="json-editor-content">{jsonContent}</pre>
+          </div>
         </div>
       )}
     </section>

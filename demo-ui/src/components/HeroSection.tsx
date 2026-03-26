@@ -47,6 +47,7 @@ export function HeroSection({
           <span>{modeLabel(mode)}</span>
           <span>Pipeline visible de bout en bout</span>
           <span>Validation humaine conservée</span>
+          <span>Exemple chargeable sans backend</span>
         </div>
       </div>
 
@@ -58,6 +59,9 @@ export function HeroSection({
             Le bouton principal appelle l’API locale si elle est disponible. Le
             scénario d’exemple charge un jeu réaliste pour la démonstration hors
             backend.
+          </p>
+          <p className="hero-note">
+            Vous pouvez donc tester l’interface même sans API disponible.
           </p>
         </div>
 

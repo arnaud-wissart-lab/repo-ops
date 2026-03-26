@@ -13,12 +13,24 @@ export function PipelineVisualizer({ steps }: PipelineVisualizerProps) {
     failed: "Erreur",
   };
 
+  const allDone = steps.every((step) => step.state === "done");
+  const hasFailure = steps.some((step) => step.state === "failed");
+  const hasWarning = steps.some((step) => step.state === "warning");
+
+  const completionLabel = hasFailure
+    ? "Analyse terminée avec erreur"
+    : hasWarning
+      ? "Analyse terminée avec vigilance"
+      : allDone
+        ? "Analyse terminée avec succès"
+        : "Pipeline prêt à s’exécuter";
+
   return (
-    <section className="panel">
+    <section className={`panel panel-reveal ${allDone ? "pipeline-panel-complete" : ""}`}>
       <div className="panel-header">
         <div>
           <p className="section-kicker">Pipeline</p>
-          <h2>Chaîne de traitement visualisée</h2>
+          <h2>Timeline du run</h2>
         </div>
         <p className="subtle-text">
           Chaque étape reflète l’état courant du run, sans automatisation
@@ -43,6 +55,11 @@ export function PipelineVisualizer({ steps }: PipelineVisualizerProps) {
             </div>
           </article>
         ))}
+      </div>
+
+      <div className={`pipeline-completion pipeline-completion-${hasFailure ? "failed" : hasWarning ? "warning" : allDone ? "done" : "idle"}`}>
+        <span className="pipeline-completion-dot" />
+        <span>{completionLabel}</span>
       </div>
     </section>
   );

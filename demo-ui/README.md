@@ -7,6 +7,8 @@ Cette interface fournit une démonstration visuelle du pipeline `repo-ops` dans 
 - déclenchement d’un run HTTP du worker ;
 - visualisation du pipeline `GitHub -> Analyse -> Décision -> Prompts -> Codex -> Validation -> Résultat` ;
 - affichage du résumé exécutif ;
+- affichage d’un bloc narratif “Ce que le système a fait” ;
+- affichage d’une timeline verticale du run ;
 - affichage des décisions du superviseur ;
 - affichage des prompts générés ;
 - affichage d’un panneau développeur avec logs et JSON brut ;
@@ -113,8 +115,10 @@ npm run build
 ## Intentions UX/UI
 
 - hiérarchie visuelle forte avec un hero clair ;
+- badge de démonstration visible en permanence ;
+- lecture narrative immédiate après le run ;
 - lecture rapide des KPI principaux ;
-- pipeline visuel immédiatement compréhensible ;
+- pipeline vertical immédiatement compréhensible ;
 - panneau développeur valorisant pour la lecture technique ;
 - détails consultables sans alourdir la page ;
 - responsive sans mécanique complexe.

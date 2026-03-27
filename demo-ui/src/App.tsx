@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Activity, Bot, LayoutDashboard } from "lucide-react";
+import { Activity, Bot, LayoutDashboard, LifeBuoy } from "lucide-react";
 import {
   buildSupervisorDecisions,
   buildSupervisorPrompts,
@@ -133,6 +133,7 @@ export default function App() {
   const [deploymentStatus, setDeploymentStatus] = useState<UiStatus>("idle");
   const [deploymentResult, setDeploymentResult] = useState<DeploymentExecutionResult | null>(null);
   const [deploymentError, setDeploymentError] = useState("");
+  const [showGuide, setShowGuide] = useState(true);
 
   function appendLog(entry: DeveloperLogEntry) {
     setLogs((current) => [...current, entry]);
@@ -449,6 +450,35 @@ export default function App() {
           </div>
         </section>
 
+        {!report ? (
+          showGuide ? (
+            <EmptyStatePanel onDismiss={() => setShowGuide(false)} />
+          ) : (
+            <Card className="section-enter">
+              <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-md bg-blue-50 p-2 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+                    <LifeBuoy className="size-4" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-foreground">Guide rapide masqué</p>
+                    <p className="text-sm text-muted-foreground">
+                      Réaffichez-le si vous souhaitez rappeler le parcours recommandé.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="text-sm font-semibold text-primary hover:text-primary/80"
+                  onClick={() => setShowGuide(true)}
+                >
+                  Afficher l’aide
+                </button>
+              </CardContent>
+            </Card>
+          )
+        ) : null}
+
         <HeroSection
           mode={activeMode}
           status={status}
@@ -474,9 +504,7 @@ export default function App() {
 
         {report && decisions && codex ? (
           <NarrativeSummary report={report} decisions={decisions} codex={codex} />
-        ) : (
-          <EmptyStatePanel />
-        )}
+        ) : null}
 
         <KpiGrid
           analyzedPullRequests={analyzedPullRequests}

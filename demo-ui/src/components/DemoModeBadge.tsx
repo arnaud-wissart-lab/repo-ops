@@ -1,9 +1,10 @@
-import { MonitorCog, MoonStar, SunMedium } from "lucide-react";
+import { LaptopMinimal, MoonStar, SunMedium } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
 
 export function DemoModeBadge() {
-  const { theme, resolvedTheme, setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
 
   return (
     <div
@@ -16,40 +17,42 @@ export function DemoModeBadge() {
       </div>
 
       <div className="flex items-center gap-2">
-        <label
-          className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground"
-          htmlFor="theme-select"
-        >
+        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
           Thème
-        </label>
-
-        <div className="relative">
-          <select
-            id="theme-select"
-            className="h-9 min-w-32 rounded-md border border-border bg-card pl-9 pr-3 text-sm text-foreground"
-            value={theme ?? "light"}
-            onChange={(event) => setTheme(event.target.value)}
+        </span>
+        <div className="inline-flex rounded-md border border-border bg-secondary p-1">
+          <Button
+            type="button"
+            size="sm"
+            variant={theme === "light" ? "secondary" : "ghost"}
+            className="h-8 gap-1.5 px-2.5"
+            onClick={() => setTheme("light")}
           >
-            <option value="light">Clair</option>
-            <option value="dark">Sombre</option>
-            <option value="system">Auto</option>
-          </select>
-
-          <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted-foreground">
-            {theme === "dark" ? (
-              <MoonStar className="size-4" />
-            ) : theme === "system" ? (
-              <MonitorCog className="size-4" />
-            ) : (
-              <SunMedium className="size-4" />
-            )}
-          </span>
+            <SunMedium className="size-3.5" />
+            Clair
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={theme === "dark" ? "secondary" : "ghost"}
+            className="h-8 gap-1.5 px-2.5"
+            onClick={() => setTheme("dark")}
+          >
+            <MoonStar className="size-3.5" />
+            Sombre
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={theme === "system" ? "secondary" : "ghost"}
+            className="h-8 gap-1.5 px-2.5"
+            onClick={() => setTheme("system")}
+          >
+            <LaptopMinimal className="size-3.5" />
+            Auto
+          </Button>
         </div>
       </div>
-
-      <span className="text-sm text-muted-foreground">
-        {resolvedTheme === "dark" ? "Sombre actif" : "Clair actif"}
-      </span>
     </div>
   );
 }

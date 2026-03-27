@@ -144,11 +144,11 @@ export function HeroSection({
             <Button
               type="button"
               size="lg"
-              className="h-auto items-start justify-between px-5 py-4 text-left"
+              className="h-auto min-w-0 items-start justify-between px-5 py-4 text-left"
               onClick={() => void onLoadMock()}
               disabled={isBusy}
             >
-              <span className="space-y-1">
+              <span className="min-w-0 space-y-1">
                 <span className="block text-base font-semibold">Charger un exemple</span>
                 <span className="block text-sm font-normal text-primary-foreground/85">
                   Remplit immédiatement la page avec un run réaliste et commenté.
@@ -161,11 +161,11 @@ export function HeroSection({
               type="button"
               size="lg"
               variant="secondary"
-              className="h-auto items-start justify-between px-5 py-4 text-left"
+              className="h-auto min-w-0 items-start justify-between px-5 py-4 text-left"
               onClick={() => void onRun()}
               disabled={isBusy}
             >
-              <span className="space-y-1">
+              <span className="min-w-0 space-y-1">
                 <span className="block text-base font-semibold">
                   {isLoading ? "Analyse en cours..." : "Lancer une analyse réelle"}
                 </span>
@@ -180,11 +180,11 @@ export function HeroSection({
               type="button"
               variant="outline"
               size="lg"
-              className="h-auto items-start justify-between px-5 py-4 text-left"
+              className="h-auto min-w-0 items-start justify-between px-5 py-4 text-left"
               onClick={() => void onDeploy()}
               disabled={isBusy}
             >
-              <span className="space-y-1">
+              <span className="min-w-0 space-y-1">
                 <span className="block text-base font-semibold">
                   {isDeploying ? "Déploiement en cours..." : "Déployer en local"}
                 </span>

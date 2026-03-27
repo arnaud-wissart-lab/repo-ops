@@ -28,11 +28,11 @@ const defaultTimeoutMs = Number(import.meta.env.VITE_DEMO_API_TIMEOUT_MS ?? 3000
 const configuredMode = normalizeDemoMode(import.meta.env.VITE_DEMO_MODE);
 
 function normalizeDemoMode(value?: string): DemoMode {
-  if (value === "mock" || value === "auto") {
+  if (value === "mock" || value === "auto" || value === "api") {
     return value;
   }
 
-  return "api";
+  return "auto";
 }
 
 async function postJson<TRequest, TResponse>(

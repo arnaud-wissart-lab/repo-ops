@@ -500,10 +500,16 @@ export default function App() {
                 <p className="run-scenario-text">Scénario : {scenarioLabel}</p>
               </div>
             ) : (
-              <p className="subtle-text">
-                Lancez un scénario API ou chargez un exemple pour explorer le
-                cockpit.
-              </p>
+              <div className="run-context-inline">
+                <p className="subtle-text">
+                  Cette application sert à suivre un cycle de maintenance, pas à administrer
+                  directement les dépôts.
+                </p>
+                <p className="subtle-text">
+                  Commencez par <strong>Charger un exemple</strong> pour comprendre les
+                  écrans, puis utilisez <strong>Lancer une analyse</strong> pour un run réel.
+                </p>
+              </div>
             )}
           </div>
 

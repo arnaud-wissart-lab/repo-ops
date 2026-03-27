@@ -43,31 +43,32 @@ export function HeroSection({
           <StatusPill label="Aucune modification réelle" tone="neutral" />
         </div>
         <p className="section-kicker">RepoOps Live Demo</p>
-        <h1>Le cockpit local qui raconte tout le pipeline de maintenance.</h1>
+        <h1>Suivre un run de maintenance logicielle, du signal GitHub à la synthèse.</h1>
         <p className="hero-description">
-          Cette interface met en scène le run du worker, les décisions,
-          l’enchaînement superviseur et les sorties techniques, dans une
-          démonstration sûre pensée pour la relecture technique.
+          Cette page sert à comprendre ce que fait RepoOps sur un cycle de maintenance :
+          collecte, analyse, décisions, prompts et sortie technique. Elle doit d’abord
+          être lisible, puis démonstrative.
         </p>
         <div className="hero-meta">
           <span>{modeLabel(mode)}</span>
-          <span>Pipeline visible de bout en bout</span>
+          <span>Cycle expliqué étape par étape</span>
           <span>Validation humaine conservée</span>
-          <span>Exemple chargeable sans backend</span>
+          <span>Exemple disponible sans backend</span>
         </div>
       </div>
 
       <aside className="hero-actions-card">
         <div>
           <p className="section-kicker">Déclenchement</p>
-          <h2>Lancer un scénario contrôlé</h2>
+          <h2>Commencer par un scénario lisible</h2>
           <p className="subtle-text">
-            Le bouton principal appelle l’API locale si elle est disponible. Le
-            scénario d’exemple charge un jeu réaliste pour la démonstration hors
-            backend.
+            Si l’API locale est disponible, l’analyse utilise les endpoints réels.
+            Sinon, le chargement d’exemple permet de comprendre immédiatement le rôle
+            de l’application.
           </p>
           <p className="hero-note">
-            Vous pouvez donc tester l’interface même sans API disponible.
+            Recommandation : commencez par <strong>Charger un exemple</strong> pour
+            visualiser un run complet, puis passez à l’analyse réelle.
           </p>
         </div>
 
@@ -105,10 +106,10 @@ export function HeroSection({
         </div>
         <p className="hero-feedback">
           {isLoading
-            ? "Le pipeline se déroule étape par étape pour rendre l’exécution lisible."
+            ? "Le pipeline se déroule étape par étape pour rendre l’exécution compréhensible."
             : isDeploying
               ? "Le worker déclenche le déploiement local configuré pour cette machine."
-              : "Le déclenchement reste strictement en dry-run sur les actions sensibles et le déploiement vise la même machine locale."}
+              : "La page reste en mode démonstration : les actions sensibles restent contrôlées et le scénario mock permet de comprendre RepoOps sans dépendre du backend."}
         </p>
       </aside>
     </header>

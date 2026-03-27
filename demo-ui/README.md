@@ -104,6 +104,8 @@ Valeurs supportées :
 - `mock` : la page charge directement le scénario mock ;
 - `auto` : la page tente l’API, puis peut basculer vers le mock si l’appel échoue.
 
+Le mode par défaut retenu pour la démo publique est `auto`, afin d’éviter une page bloquée si l’API locale n’est pas disponible ou mal routée.
+
 Exemple :
 
 ```powershell

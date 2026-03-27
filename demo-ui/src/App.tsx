@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   buildSupervisorDecisions,
   buildSupervisorPrompts,
@@ -30,6 +30,8 @@ import type {
   PipelineStep,
   PipelineStepKey,
   PipelineStepState,
+  ResolvedTheme,
+  ThemePreference,
   UiStatus,
 } from "./types";
 import {
@@ -38,6 +40,9 @@ import {
   detectScenarioLabel,
   formatDuration,
   formatRelativeTime,
+  readStoredThemePreference,
+  resolveThemePreference,
+  writeStoredThemePreference,
 } from "./utils";
 
 const configuredMode = getConfiguredDemoMode();
@@ -131,6 +136,12 @@ function statusTone(status: UiStatus): "neutral" | "done" | "warning" | "failed"
 }
 
 export default function App() {
+  const [themePreference, setThemePreference] = useState<ThemePreference>(() =>
+    readStoredThemePreference(),
+  );
+  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
+    resolveThemePreference(readStoredThemePreference()),
+  );
   const [status, setStatus] = useState<UiStatus>("idle");
   const [run, setRun] = useState<DemoRunState | null>(null);
   const [error, setError] = useState("");
@@ -140,6 +151,34 @@ export default function App() {
   const [deploymentStatus, setDeploymentStatus] = useState<UiStatus>("idle");
   const [deploymentResult, setDeploymentResult] = useState<DeploymentExecutionResult | null>(null);
   const [deploymentError, setDeploymentError] = useState("");
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+
+    const applyTheme = (prefersDark: boolean) => {
+      const nextTheme = resolveThemePreference(themePreference, prefersDark);
+      setResolvedTheme(nextTheme);
+      document.documentElement.dataset.theme = nextTheme;
+      document.documentElement.style.colorScheme = nextTheme;
+      writeStoredThemePreference(themePreference);
+    };
+
+    applyTheme(mediaQuery.matches);
+
+    const handleChange = (event: MediaQueryListEvent) => {
+      if (themePreference === "auto") {
+        applyTheme(event.matches);
+      }
+    };
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", handleChange);
+      return () => mediaQuery.removeEventListener("change", handleChange);
+    }
+
+    mediaQuery.addListener(handleChange);
+    return () => mediaQuery.removeListener(handleChange);
+  }, [themePreference]);
 
   function appendLog(entry: DeveloperLogEntry) {
     setLogs((current) => [...current, entry]);
@@ -414,7 +453,11 @@ export default function App() {
     <div className="app-shell">
       <div className="ambient ambient-left" />
       <div className="ambient ambient-right" />
-      <DemoModeBadge />
+      <DemoModeBadge
+        themePreference={themePreference}
+        resolvedTheme={resolvedTheme}
+        onThemeChange={setThemePreference}
+      />
 
       <main className="layout">
         <HeroSection

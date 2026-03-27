@@ -1,4 +1,11 @@
-import type { DeveloperLogEntry, LogLevel } from "./types";
+import type {
+  DeveloperLogEntry,
+  LogLevel,
+  ResolvedTheme,
+  ThemePreference,
+} from "./types";
+
+const themeStorageKey = "repoops-demo-theme";
 
 export function formatDateTime(value?: string): string {
   if (!value) {
@@ -133,4 +140,44 @@ export function createDerivedLogEntries(
     source,
     message: line,
   }));
+}
+
+export function readStoredThemePreference(): ThemePreference {
+  if (typeof window === "undefined") {
+    return "light";
+  }
+
+  const value = window.localStorage.getItem(themeStorageKey);
+  if (value === "light" || value === "dark" || value === "auto") {
+    return value;
+  }
+
+  return "light";
+}
+
+export function writeStoredThemePreference(preference: ThemePreference): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(themeStorageKey, preference);
+}
+
+export function resolveThemePreference(
+  preference: ThemePreference,
+  prefersDark?: boolean,
+): ResolvedTheme {
+  if (preference === "light" || preference === "dark") {
+    return preference;
+  }
+
+  if (typeof prefersDark === "boolean") {
+    return prefersDark ? "dark" : "light";
+  }
+
+  if (typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+    return "dark";
+  }
+
+  return "light";
 }

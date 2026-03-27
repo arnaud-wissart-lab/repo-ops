@@ -50,8 +50,8 @@ export function HeroSection({
   const isBusy = isLoading || isDeploying;
 
   return (
-    <section className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
-      <Card className="section-enter overflow-hidden">
+    <section className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)] xl:items-start">
+      <Card className="section-enter self-start overflow-hidden">
         <CardContent className="px-7 py-7 lg:px-8 lg:py-8">
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <Badge variant="neutral">Tableau de bord</Badge>
@@ -115,7 +115,7 @@ export function HeroSection({
         </CardContent>
       </Card>
 
-      <Card className="section-enter h-full">
+      <Card className="section-enter self-start">
         <CardHeader>
           <CardHeading>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -144,13 +144,13 @@ export function HeroSection({
             <Button
               type="button"
               size="lg"
-              className="h-auto min-w-0 items-start justify-between px-5 py-4 text-left"
+              className="h-auto min-w-0 items-start justify-between whitespace-normal px-5 py-4 text-left"
               onClick={() => void onLoadMock()}
               disabled={isBusy}
             >
-              <span className="min-w-0 space-y-1">
+              <span className="min-w-0 space-y-1 pr-3">
                 <span className="block text-base font-semibold">Charger un exemple</span>
-                <span className="block text-sm font-normal text-primary-foreground/85">
+                <span className="block break-words text-sm font-normal text-primary-foreground/85">
                   Remplit immédiatement la page avec un run réaliste et commenté.
                 </span>
               </span>
@@ -161,15 +161,15 @@ export function HeroSection({
               type="button"
               size="lg"
               variant="secondary"
-              className="h-auto min-w-0 items-start justify-between px-5 py-4 text-left"
+              className="h-auto min-w-0 items-start justify-between whitespace-normal px-5 py-4 text-left"
               onClick={() => void onRun()}
               disabled={isBusy}
             >
-              <span className="min-w-0 space-y-1">
+              <span className="min-w-0 space-y-1 pr-3">
                 <span className="block text-base font-semibold">
                   {isLoading ? "Analyse en cours..." : "Lancer une analyse réelle"}
                 </span>
-                <span className="block text-sm font-normal text-muted-foreground">
+                <span className="block break-words text-sm font-normal text-muted-foreground">
                   Utilise l’API locale si elle répond, sinon la page bascule automatiquement sur le mock.
                 </span>
               </span>
@@ -180,15 +180,15 @@ export function HeroSection({
               type="button"
               variant="outline"
               size="lg"
-              className="h-auto min-w-0 items-start justify-between px-5 py-4 text-left"
+              className="h-auto min-w-0 items-start justify-between whitespace-normal px-5 py-4 text-left"
               onClick={() => void onDeploy()}
               disabled={isBusy}
             >
-              <span className="min-w-0 space-y-1">
+              <span className="min-w-0 space-y-1 pr-3">
                 <span className="block text-base font-semibold">
                   {isDeploying ? "Déploiement en cours..." : "Déployer en local"}
                 </span>
-                <span className="block text-sm font-normal text-muted-foreground">
+                <span className="block break-words text-sm font-normal text-muted-foreground">
                   Déclenche le workflow manuel prévu pour votre machine personnelle.
                 </span>
               </span>

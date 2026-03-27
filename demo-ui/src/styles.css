@@ -172,7 +172,7 @@
   }
 
   .app-page {
-    @apply mx-auto flex w-full max-w-[1480px] flex-col gap-5 px-4 pb-12 pt-5 sm:px-6 lg:px-8;
+    @apply mx-auto flex w-full max-w-[1480px] flex-col gap-5 px-4 pb-16 pt-5 sm:px-6 lg:px-8;
   }
 
   .page-toolbar {
@@ -227,7 +227,7 @@
   }
 
   .dashboard-grid {
-    @apply grid gap-5 xl:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)];
+    @apply grid gap-5 xl:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)] xl:items-start;
   }
 
   .dashboard-main {
@@ -240,6 +240,7 @@
 
   .surface-subtle {
     @apply rounded-lg border border-border bg-secondary/70;
+    overflow-wrap: anywhere;
   }
 
   .surface-accent {
@@ -268,6 +269,10 @@
     @apply ml-auto;
   }
 
+  .app-page > :last-child {
+    @apply mb-4;
+  }
+
   .status-glow-success {
     box-shadow: 0 0 0 1px rgba(23, 198, 83, 0.08), 0 18px 36px rgba(23, 198, 83, 0.08);
   }
@@ -293,6 +298,10 @@
 
     .app-header .glass-panel {
       @apply w-full justify-between;
+    }
+
+    .page-toolbar-description {
+      @apply text-sm leading-6;
     }
   }
 }

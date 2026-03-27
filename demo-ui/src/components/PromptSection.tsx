@@ -110,7 +110,7 @@ export function PromptSection({ prompts }: PromptSectionProps) {
       </CardHeader>
       <CardContent>
       {prompts.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border bg-secondary/50 p-6 text-sm text-muted-foreground">
+        <div className="empty-state-block">
           Aucun prompt n’a été généré pour ce run.
         </div>
       ) : (

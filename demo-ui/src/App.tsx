@@ -506,47 +506,65 @@ export default function App() {
           <NarrativeSummary report={report} decisions={decisions} codex={codex} />
         ) : null}
 
-        <KpiGrid
-          analyzedPullRequests={analyzedPullRequests}
-          readyPullRequests={readyPullRequests}
-          blockedPullRequests={blockedPullRequests}
-          vulnerabilities={report?.vulnerabilities.openAlerts ?? 0}
-          proposedActions={proposedActions}
-        />
+        {report ? (
+          <>
+            <KpiGrid
+              analyzedPullRequests={analyzedPullRequests}
+              readyPullRequests={readyPullRequests}
+              blockedPullRequests={blockedPullRequests}
+              vulnerabilities={report.vulnerabilities.openAlerts}
+              proposedActions={proposedActions}
+            />
 
-        <div className="dashboard-grid">
-          <div className="dashboard-main">
-            <PipelineVisualizer steps={toPipelineSteps(pipelineStates)} />
-            <DecisionSection actions={decisions?.actions ?? []} />
-            <PromptSection prompts={prompts?.prompts ?? []} />
-          </div>
+            <div className="dashboard-grid">
+              <div className="dashboard-main">
+                <PipelineVisualizer steps={toPipelineSteps(pipelineStates)} />
+                <DecisionSection actions={decisions?.actions ?? []} />
+                <PromptSection prompts={prompts?.prompts ?? []} />
+              </div>
 
-          <div className="dashboard-side">
-            {report && decisions && codex ? (
-              <RunSummary report={report} decisions={decisions} codex={codex} />
-            ) : (
+              <div className="dashboard-side">
+                {decisions && codex ? (
+                  <RunSummary report={report} decisions={decisions} codex={codex} />
+                ) : null}
+                <DeveloperPanel logs={logs} run={run} />
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="dashboard-grid">
+            <div className="dashboard-main">
+              <PipelineVisualizer steps={toPipelineSteps(pipelineStates)} />
+            </div>
+
+            <div className="dashboard-side">
               <Card className="section-enter">
                 <CardHeader>
                   <CardHeading>
                     <div className="mb-2 flex items-center gap-2">
-                      <Badge variant="neutral">Synthèse</Badge>
+                      <Badge variant="neutral">Après le lancement</Badge>
                       <Bot className="size-4 text-primary" />
                     </div>
-                    <CardTitle>Vue d’ensemble du run</CardTitle>
+                    <CardTitle>Ce que la page affichera ensuite</CardTitle>
                     <CardDescription>
-                      La synthèse opérationnelle apparaîtra ici après le premier scénario.
+                      Le tableau de bord complet n’apparaît qu’après le premier scénario, pour éviter un écran vide difficile à lire.
                     </CardDescription>
                   </CardHeading>
                 </CardHeader>
-                <CardContent className="text-sm leading-6 text-muted-foreground">
-                  Chargez un exemple pour voir immédiatement un run complet, puis utilisez l’analyse réelle pour tester la chaîne locale.
+                <CardContent className="space-y-4">
+                  <div className="empty-state-block">
+                    <p className="font-semibold text-foreground">Après le premier run, vous verrez :</p>
+                    <ul className="mt-3 space-y-2 text-sm leading-6 text-muted-foreground">
+                      <li>un résumé métier immédiat ;</li>
+                      <li>les KPI du run et la timeline complète ;</li>
+                      <li>les décisions, prompts et logs techniques.</li>
+                    </ul>
+                  </div>
                 </CardContent>
               </Card>
-            )}
-
-            <DeveloperPanel logs={logs} run={run} />
+            </div>
           </div>
-        </div>
+        )}
       </main>
     </div>
   );

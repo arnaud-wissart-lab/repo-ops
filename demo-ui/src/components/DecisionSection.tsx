@@ -69,7 +69,7 @@ export function DecisionSection({ actions }: DecisionSectionProps) {
       </CardHeader>
       <CardContent>
         {actions.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border bg-secondary/50 p-6 text-sm text-muted-foreground">
+          <div className="empty-state-block">
             Aucune action structurée n’a été produite pour ce scénario.
           </div>
         ) : (

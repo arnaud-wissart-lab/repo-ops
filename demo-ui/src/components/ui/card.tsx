@@ -9,7 +9,7 @@ export function Card({
     <div
       data-slot="card"
       className={cn(
-        "glass-panel rounded-2xl border border-border/80 bg-card/90 shadow-[0_16px_40px_rgba(15,23,42,0.06)] dark:shadow-[0_18px_50px_rgba(0,0,0,0.35)]",
+        "glass-panel rounded-xl border border-border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04),0_6px_18px_rgba(15,23,42,0.04)]",
         className,
       )}
       {...props}
@@ -24,7 +24,7 @@ export function CardHeader({
   return (
     <div
       data-slot="card-header"
-      className={cn("flex items-start justify-between gap-4 border-b border-border/70 px-6 py-5", className)}
+      className={cn("flex items-start justify-between gap-4 border-b border-border px-5 py-4", className)}
       {...props}
     />
   );
@@ -44,7 +44,7 @@ export function CardTitle({
   return (
     <h2
       data-slot="card-title"
-      className={cn("text-lg font-semibold tracking-tight text-foreground", className)}
+      className={cn("text-lg font-semibold text-foreground", className)}
       {...props}
     />
   );
@@ -74,7 +74,7 @@ export function CardContent({
   className,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div data-slot="card-content" className={cn("px-6 py-5", className)} {...props} />;
+  return <div data-slot="card-content" className={cn("px-5 py-4", className)} {...props} />;
 }
 
 export function CardFooter({
@@ -84,7 +84,7 @@ export function CardFooter({
   return (
     <div
       data-slot="card-footer"
-      className={cn("flex items-center justify-between gap-3 border-t border-border/70 px-6 py-4", className)}
+      className={cn("flex items-center justify-between gap-3 border-t border-border px-5 py-4", className)}
       {...props}
     />
   );

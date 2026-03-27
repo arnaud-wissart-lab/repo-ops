@@ -62,17 +62,15 @@ export function NarrativeSummary({
       <CardHeader>
         <CardHeading>
           <div className="mb-2 flex flex-wrap items-center gap-2">
-            <Badge variant="info">Ce que le système a fait</Badge>
+            <Badge variant="info">Résumé métier</Badge>
             <StatusPill label={report.summary.status} tone={statusTone(report.summary.status)} />
           </div>
           <CardTitle>Lecture immédiate du run</CardTitle>
-          <p className="text-sm leading-6 text-muted-foreground">
-            Ce bloc raconte le run sans vous obliger à lire le pipeline complet ou la sortie JSON.
-          </p>
+          <p className="text-sm leading-6 text-muted-foreground">Lecture courte du run, pensée pour être comprise immédiatement.</p>
         </CardHeading>
       </CardHeader>
       <CardContent className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
-        <div className="rounded-2xl border border-border/70 bg-card/80 p-5">
+        <div className="surface-subtle p-5">
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Analyse terminée</p>
           <ul className="mt-4 space-y-3 text-sm text-foreground">
             <li className="flex items-center gap-3">
@@ -101,7 +99,7 @@ export function NarrativeSummary({
             </li>
           </ul>
 
-          <div className="mt-5 rounded-2xl border border-primary/15 bg-accent/70 p-4">
+          <div className="mt-5 surface-accent p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Action recommandée</p>
             <div className="mt-2 flex items-start gap-3">
               <ArrowRightCircle className="mt-0.5 size-4 shrink-0 text-primary" />
@@ -111,9 +109,9 @@ export function NarrativeSummary({
         </div>
 
         <div className="grid gap-4">
-          <div className="rounded-2xl border border-border/70 bg-card/80 p-5">
+          <div className="surface-subtle p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Scénario</p>
-            <h3 className="mt-2 text-lg font-semibold tracking-tight">{scenario}</h3>
+            <h3 className="mt-2 text-lg font-semibold">{scenario}</h3>
             <ul className="mt-4 space-y-2 text-sm leading-6 text-muted-foreground">
               <li>{report.summary.counts.failedPullRequests} PR en échec à traiter</li>
               <li>
@@ -125,9 +123,9 @@ export function NarrativeSummary({
             </ul>
           </div>
 
-          <div className="rounded-2xl border border-border/70 bg-card/80 p-5">
+          <div className="surface-subtle p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Trace métier</p>
-            <h3 className="mt-2 text-lg font-semibold tracking-tight">{report.digest.subject}</h3>
+            <h3 className="mt-2 text-lg font-semibold">{report.digest.subject}</h3>
             <ul className="mt-4 space-y-2 text-sm leading-6 text-muted-foreground">
               <li>{decisions.summary.totalActions} décision{decisions.summary.totalActions > 1 ? "s" : ""} structurée{decisions.summary.totalActions > 1 ? "s" : ""}</li>
               <li>{codex.summary.totalResponses} réponse{codex.summary.totalResponses > 1 ? "s" : ""} générée{codex.summary.totalResponses > 1 ? "s" : ""}</li>

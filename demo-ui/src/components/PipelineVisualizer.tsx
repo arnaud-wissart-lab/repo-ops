@@ -54,7 +54,7 @@ export function PipelineVisualizer({ steps }: PipelineVisualizerProps) {
           </div>
           <CardTitle>Timeline du run</CardTitle>
           <CardDescription>
-            Chaque étape reflète l’état courant du run, avec une lecture séquentielle claire et sans automatisation dangereuse.
+            Lecture séquentielle du pipeline, dans un format de suivi plus proche d’un cockpit de supervision.
           </CardDescription>
         </CardHeading>
       </CardHeader>
@@ -85,14 +85,14 @@ export function PipelineVisualizer({ steps }: PipelineVisualizerProps) {
             return (
               <article key={step.key} className="grid gap-4 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
                 <div className="relative flex flex-col items-center">
-                  <span className="z-10 flex size-10 items-center justify-center rounded-2xl border border-border bg-card shadow-sm">
+                  <span className="z-10 flex size-10 items-center justify-center rounded-lg border border-border bg-card shadow-sm">
                     <Icon className={`size-5 ${iconClassName}`} />
                   </span>
                   {index < steps.length - 1 ? (
                     <span className="absolute left-1/2 top-10 h-[calc(100%+0.75rem)] w-px -translate-x-1/2 bg-border" />
                   ) : null}
                 </div>
-                <div className="rounded-2xl border border-border/70 bg-card/70 p-4">
+                <div className="surface-subtle p-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-base font-semibold text-foreground">{step.label}</p>
                     <Badge variant="neutral">Étape {index + 1}</Badge>
@@ -120,7 +120,7 @@ export function PipelineVisualizer({ steps }: PipelineVisualizerProps) {
         </div>
 
         <div
-          className={`rounded-2xl border p-4 ${
+          className={`rounded-lg border p-4 ${
             hasFailure
               ? "border-rose-200 bg-rose-50 dark:border-rose-900 dark:bg-rose-950/30"
               : hasWarning

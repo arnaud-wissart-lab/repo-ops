@@ -63,7 +63,7 @@ export function DeveloperPanel({ logs, run }: DeveloperPanelProps) {
       </CardHeader>
       <CardContent>
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabKey)}>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="developer-toolbar">
             <TabsList>
               <TabsTrigger value="logs">
                 <Logs className="size-4" />

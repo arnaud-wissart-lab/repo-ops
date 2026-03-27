@@ -65,7 +65,7 @@ export function KpiGrid({
   return (
     <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
       {items.map((item) => (
-        <Card key={item.key} className="section-enter transition-transform duration-200 hover:-translate-y-0.5">
+        <Card key={item.key} className="section-enter metric-tile">
           <CardContent className="space-y-4 px-5 py-5">
             <div className="flex items-start justify-between gap-3">
               <div className="space-y-1">
@@ -74,15 +74,15 @@ export function KpiGrid({
                 </p>
                 <h3 className="text-sm font-medium text-foreground">{item.label}</h3>
               </div>
-              <span className={`inline-flex rounded-xl p-2 ${item.iconClassName}`}>
+              <span className={`inline-flex rounded-md p-2 ${item.iconClassName}`}>
                 <item.icon className="size-4" />
               </span>
             </div>
             <div className="space-y-1">
-              <strong className="block text-4xl font-semibold tracking-tight text-foreground">
+              <strong className="block text-4xl font-semibold text-foreground">
                 {values[item.key]}
               </strong>
-              <span className="text-sm text-muted-foreground">Lecture instantanée du run</span>
+              <span className="text-sm text-muted-foreground">Lecture instantanée</span>
             </div>
           </CardContent>
         </Card>

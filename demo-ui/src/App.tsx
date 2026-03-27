@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Activity, Bot, LayoutDashboard } from "lucide-react";
 import {
   buildSupervisorDecisions,
   buildSupervisorPrompts,
@@ -20,7 +21,16 @@ import { NarrativeSummary } from "./components/NarrativeSummary";
 import { PipelineVisualizer } from "./components/PipelineVisualizer";
 import { PromptSection } from "./components/PromptSection";
 import { RunSummary } from "./components/RunSummary";
-import { StatusPill } from "./components/StatusPill";
+import { Badge } from "./components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "./components/ui/alert";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardHeading,
+  CardTitle,
+} from "./components/ui/card";
 import type {
   DemoMode,
   DemoRunState,
@@ -36,19 +46,8 @@ import {
   createDerivedLogEntries,
   createLogEntry,
   detectScenarioLabel,
-  formatDuration,
   formatRelativeTime,
 } from "./utils";
-import { Alert, AlertDescription, AlertTitle } from "./components/ui/alert";
-import { Badge } from "./components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardHeading,
-  CardTitle,
-} from "./components/ui/card";
 
 const configuredMode = getConfiguredDemoMode();
 
@@ -122,22 +121,6 @@ function githubTone(report: MaintenanceRunReport): PipelineStepState {
   }
 
   return "done";
-}
-
-function statusTone(status: UiStatus): "neutral" | "done" | "warning" | "failed" {
-  if (status === "success") {
-    return "done";
-  }
-
-  if (status === "loading") {
-    return "warning";
-  }
-
-  if (status === "error") {
-    return "failed";
-  }
-
-  return "neutral";
 }
 
 export default function App() {
@@ -422,150 +405,70 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <DemoModeBadge />
+      <header className="app-header">
+        <div className="app-header-container">
+          <div className="app-brand">
+            <div className="app-brand-mark">
+              <LayoutDashboard className="size-5" />
+            </div>
+            <div className="app-brand-copy">
+              <p className="app-brand-title">RepoOps Live Demo</p>
+              <p className="app-brand-subtitle">Supervision et maintenance logicielle</p>
+            </div>
+          </div>
 
-      <main className="mx-auto flex w-full max-w-[1480px] flex-col gap-6 px-4 pb-12 pt-2 sm:px-6 lg:px-8">
+          <DemoModeBadge />
+        </div>
+      </header>
+
+      <main className="app-page">
+        <section className="page-toolbar section-enter">
+          <div className="page-toolbar-heading">
+            <p className="page-toolbar-kicker">Dashboard</p>
+            <h1 className="page-toolbar-title">Centre de supervision RepoOps</h1>
+            <p className="page-toolbar-description">
+              Visualisez comment RepoOps agrège les signaux GitHub, prépare des décisions explicables et organise la relecture d’un run sans passer par les logs bruts.
+            </p>
+          </div>
+
+          <div className="page-toolbar-meta">
+            <div className="toolbar-metric">
+              <span className="toolbar-metric-label">Scénario</span>
+              <strong className="toolbar-metric-value">{scenarioLabel}</strong>
+            </div>
+            <div className="toolbar-metric">
+              <span className="toolbar-metric-label">Dernière exécution</span>
+              <strong className="toolbar-metric-value">
+                {report ? formatRelativeTime(report.summary.runDateUtc) : "Aucun run"}
+              </strong>
+            </div>
+            <div className="toolbar-metric">
+              <span className="toolbar-metric-label">Mode</span>
+              <strong className="toolbar-metric-value">Démonstration / dry-run</strong>
+            </div>
+          </div>
+        </section>
+
         <HeroSection
           mode={activeMode}
           status={status}
           deploymentStatus={deploymentStatus}
+          deploymentResult={deploymentResult}
+          deploymentError={deploymentError}
           onRun={() => executeScenario(configuredMode)}
           onLoadMock={() => executeScenario("mock")}
           onDeploy={() => executeDeployment(configuredMode)}
         />
 
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)_minmax(320px,0.8fr)]">
-          <Card className="section-enter">
-            <CardHeader>
-              <CardHeading>
-                <div className="mb-2 flex items-center gap-2">
-                  <Badge variant="neutral">Contexte</Badge>
-                  <StatusPill
-                    label={
-                      status === "idle"
-                        ? "Prêt"
-                        : status === "loading"
-                          ? "Exécution"
-                          : status === "success"
-                            ? "Terminé"
-                            : "Erreur"
-                    }
-                    tone={statusTone(status)}
-                  />
-                </div>
-                <CardTitle>Lecture de la démo</CardTitle>
-                <CardDescription>
-                  Un run complet de maintenance logicielle, depuis les signaux GitHub jusqu’à la synthèse exploitable.
-                </CardDescription>
-              </CardHeading>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
-              {report ? (
-                <>
-                  <p>
-                    Dernière exécution : <strong className="text-foreground">{formatRelativeTime(report.summary.runDateUtc)}</strong> · durée{" "}
-                    <strong className="text-foreground">{formatDuration(report.observability?.durationMilliseconds)}</strong>
-                  </p>
-                  <p>
-                    Mode : <strong className="text-foreground">démonstration / dry-run</strong> · source{" "}
-                    <strong className="text-foreground">{run?.source === "mock" ? "mock" : "API"}</strong>
-                  </p>
-                  <p>
-                    Scénario : <strong className="text-foreground">{scenarioLabel}</strong>
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p>
-                    Cette application sert à suivre et expliquer un cycle de maintenance, pas à administrer directement des dépôts.
-                  </p>
-                  <p>
-                    Commencez par <strong className="text-foreground">Charger un exemple</strong>, puis testez{" "}
-                    <strong className="text-foreground">Lancer une analyse réelle</strong> si le worker est disponible.
-                  </p>
-                </>
-              )}
-              {error ? (
-                <Alert variant="danger">
-                  <div>
-                    <AlertTitle>Exécution interrompue</AlertTitle>
-                    <AlertDescription>{error}</AlertDescription>
-                  </div>
-                </Alert>
-              ) : null}
-            </CardContent>
-          </Card>
-
-          <Card className="section-enter">
-            <CardHeader>
-              <CardHeading>
-                <Badge variant="info">Déploiement local</Badge>
-                <CardTitle>Bouton de déploiement</CardTitle>
-                <CardDescription>
-                  Workflow manuel prévu pour votre machine personnelle, avec vérification finale.
-                </CardDescription>
-              </CardHeading>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
-              <StatusPill
-                label={
-                  deploymentStatus === "idle"
-                    ? "Non déclenché"
-                    : deploymentStatus === "loading"
-                      ? "Déploiement"
-                      : deploymentStatus === "success"
-                        ? deploymentResult?.dryRunEnabled
-                          ? "Dry-run exécuté"
-                          : "Déployé"
-                        : "Échec"
-                }
-                tone={statusTone(deploymentStatus)}
-              />
-              {deploymentResult ? (
-                <>
-                  <p>{deploymentResult.summary}</p>
-                  <p>
-                    Cible : <strong className="text-foreground">{deploymentResult.targetName}</strong> · durée{" "}
-                    <strong className="text-foreground">{deploymentResult.durationSeconds?.toFixed(1) ?? "0.0"} s</strong>
-                  </p>
-                  <p>Vérification : <strong className="text-foreground">{deploymentResult.verificationMessage}</strong></p>
-                  <p className="break-all">Commande : {deploymentResult.command}</p>
-                </>
-              ) : deploymentError ? (
-                <Alert variant="danger">
-                  <div>
-                    <AlertTitle>Déploiement interrompu</AlertTitle>
-                    <AlertDescription>{deploymentError}</AlertDescription>
-                  </div>
-                </Alert>
-              ) : (
-                <p>
-                  Déclenche un déploiement local explicite de ce dépôt sur la machine hôte, avec contrôle final de{" "}
-                  <strong className="text-foreground">https://repoops.arnaudwissart.fr</strong>.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="section-enter">
-            <CardHeader>
-              <CardHeading>
-                <Badge variant="success">Sécurité</Badge>
-                <CardTitle>Cadre de démonstration</CardTitle>
-                <CardDescription>
-                  La page reste démonstrative même lorsqu’elle appelle le backend local.
-                </CardDescription>
-              </CardHeading>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-3 text-sm leading-6 text-muted-foreground">
-                <li>Dry-run conservé sur les mécanismes sensibles.</li>
-                <li>Aucune opération Git réelle depuis l’interface.</li>
-                <li>La validation humaine reste hors de portée de la page.</li>
-              </ul>
-            </CardContent>
-          </Card>
-        </section>
+        {error ? (
+          <Alert variant="danger" className="section-enter">
+            <Activity className="size-4" />
+            <div>
+              <AlertTitle>Exécution interrompue</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </div>
+          </Alert>
+        ) : null}
 
         {report ? <GlobalStatusBanner report={report} /> : null}
 
@@ -583,36 +486,36 @@ export default function App() {
           proposedActions={proposedActions}
         />
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(340px,0.92fr)_minmax(0,1.08fr)]">
-          <PipelineVisualizer steps={toPipelineSteps(pipelineStates)} />
-          {report && decisions && codex ? (
-            <RunSummary report={report} decisions={decisions} codex={codex} />
-          ) : (
-            <Card className="section-enter">
-              <CardHeader>
-                <CardHeading>
-                  <Badge variant="neutral">Synthèse</Badge>
-                  <CardTitle>Résumé exécutif du run</CardTitle>
-                  <CardDescription>
-                    La synthèse consolidée apparaîtra ici après le premier scénario.
-                  </CardDescription>
-                </CardHeading>
-              </CardHeader>
-              <CardContent className="text-sm leading-6 text-muted-foreground">
-                Lancez une analyse ou chargez un exemple pour afficher la synthèse consolidée,
-                les messages importants et les réponses proposées.
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)]">
-          <div className="space-y-6">
+        <div className="dashboard-grid">
+          <div className="dashboard-main">
+            <PipelineVisualizer steps={toPipelineSteps(pipelineStates)} />
             <DecisionSection actions={decisions?.actions ?? []} />
             <PromptSection prompts={prompts?.prompts ?? []} />
           </div>
 
-          <div className="space-y-6">
+          <div className="dashboard-side">
+            {report && decisions && codex ? (
+              <RunSummary report={report} decisions={decisions} codex={codex} />
+            ) : (
+              <Card className="section-enter">
+                <CardHeader>
+                  <CardHeading>
+                    <div className="mb-2 flex items-center gap-2">
+                      <Badge variant="neutral">Synthèse</Badge>
+                      <Bot className="size-4 text-primary" />
+                    </div>
+                    <CardTitle>Vue d’ensemble du run</CardTitle>
+                    <CardDescription>
+                      La synthèse opérationnelle apparaîtra ici après le premier scénario.
+                    </CardDescription>
+                  </CardHeading>
+                </CardHeader>
+                <CardContent className="text-sm leading-6 text-muted-foreground">
+                  Chargez un exemple pour voir immédiatement un run complet, puis utilisez l’analyse réelle pour tester la chaîne locale.
+                </CardContent>
+              </Card>
+            )}
+
             <DeveloperPanel logs={logs} run={run} />
           </div>
         </div>

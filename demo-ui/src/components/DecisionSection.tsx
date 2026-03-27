@@ -60,7 +60,7 @@ export function DecisionSection({ actions }: DecisionSectionProps) {
     <Card className="section-enter">
       <CardHeader>
         <CardHeading>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Décisions</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Décisions</p>
           <CardTitle>Pourquoi ces décisions</CardTitle>
           <CardDescription>
             Le moteur reste explicable. Chaque carte montre la cible, la priorité et la raison métier.
@@ -69,7 +69,7 @@ export function DecisionSection({ actions }: DecisionSectionProps) {
       </CardHeader>
       <CardContent>
         {actions.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border bg-secondary/50 p-6 text-sm text-muted-foreground">
+          <div className="rounded-lg border border-dashed border-border bg-secondary/50 p-6 text-sm text-muted-foreground">
             Aucune action structurée n’a été produite pour ce scénario.
           </div>
         ) : (
@@ -80,7 +80,7 @@ export function DecisionSection({ actions }: DecisionSectionProps) {
               return (
                 <article
                   key={`${action.repository}-${action.pullRequestNumber ?? "repo"}-${action.type}`}
-                  className="rounded-2xl border border-border/80 bg-card/80 p-5 transition-transform duration-200 hover:-translate-y-0.5"
+                  className="decision-row p-5"
                 >
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="space-y-3">
@@ -96,7 +96,7 @@ export function DecisionSection({ actions }: DecisionSectionProps) {
                       </div>
 
                       <div className="space-y-1">
-                        <h3 className="text-lg font-semibold tracking-tight text-foreground">
+                        <h3 className="text-lg font-semibold text-foreground">
                           {action.pullRequestNumber ? `PR #${action.pullRequestNumber}` : action.repository} — {meta.label}
                         </h3>
                         <p className="text-sm text-muted-foreground">
@@ -106,15 +106,15 @@ export function DecisionSection({ actions }: DecisionSectionProps) {
                     </div>
 
                     <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2 lg:min-w-72">
-                      <div className="rounded-xl border border-border/70 bg-secondary/50 px-3 py-2">
+                      <div className="surface-subtle px-3 py-2">
                         <span className="block text-[11px] font-semibold uppercase tracking-[0.16em]">Type</span>
                         <strong className="text-sm font-semibold text-foreground">{meta.label}</strong>
                       </div>
-                      <div className="rounded-xl border border-border/70 bg-secondary/50 px-3 py-2">
+                      <div className="surface-subtle px-3 py-2">
                         <span className="block text-[11px] font-semibold uppercase tracking-[0.16em]">Priorité</span>
                         <strong className="text-sm font-semibold text-foreground">{action.priority}</strong>
                       </div>
-                      <div className="rounded-xl border border-border/70 bg-secondary/50 px-3 py-2 sm:col-span-2">
+                      <div className="surface-subtle px-3 py-2 sm:col-span-2">
                         <span className="block text-[11px] font-semibold uppercase tracking-[0.16em]">Cible</span>
                         <strong className="text-sm font-semibold text-foreground">{action.repository}</strong>
                       </div>
@@ -122,14 +122,14 @@ export function DecisionSection({ actions }: DecisionSectionProps) {
                   </div>
 
                   <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)]">
-                    <div className="rounded-2xl border border-border/70 bg-secondary/40 p-4">
+                    <div className="surface-subtle p-4">
                       <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                         Raison
                       </p>
                       <p className="text-sm leading-6 text-foreground">{action.reason}</p>
                     </div>
 
-                    <div className="rounded-2xl border border-border/70 bg-secondary/40 p-4">
+                    <div className="surface-subtle p-4">
                       <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                         Action suggérée
                       </p>

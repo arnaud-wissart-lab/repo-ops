@@ -1,5 +1,13 @@
 import type { DemoMode, DeploymentExecutionResult, UiStatus } from "../types";
-import { ArrowRight, PlayCircle, Rocket, ServerCog, ShieldCheck, Sparkles } from "lucide-react";
+import {
+  ArrowRight,
+  ExternalLink,
+  Rocket,
+  ServerCog,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
+import { demoRepositorySlug, demoRepositoryUrl } from "../utils";
 import { StatusPill } from "./StatusPill";
 import { Badge } from "./ui/badge";
 import {
@@ -19,20 +27,11 @@ interface HeroSectionProps {
   deploymentResult: DeploymentExecutionResult | null;
   deploymentError: string;
   onRun: () => Promise<void>;
-  onLoadMock: () => Promise<void>;
   onDeploy: () => Promise<void>;
 }
 
 function modeLabel(mode: DemoMode): string {
-  if (mode === "mock") {
-    return "Source mock";
-  }
-
-  if (mode === "auto") {
-    return "Mode auto";
-  }
-
-  return "Source API";
+  return mode === "api" ? "Source GitHub réelle" : "Source inconnue";
 }
 
 export function HeroSection({
@@ -42,7 +41,6 @@ export function HeroSection({
   deploymentResult,
   deploymentError,
   onRun,
-  onLoadMock,
   onDeploy,
 }: HeroSectionProps) {
   const isLoading = status === "loading";
@@ -68,9 +66,9 @@ export function HeroSection({
                 Centre de supervision de maintenance logicielle
               </h2>
               <p className="max-w-3xl text-sm leading-7 text-muted-foreground md:text-base">
-                Cette page sert à visualiser un run RepoOps comme un écran de pilotage :
-                état du pipeline, arbitrages du superviseur, prompts techniques, synthèse
-                métier et sortie brute pour relecture.
+                RepoOps analyse le dépôt public <strong>{demoRepositorySlug}</strong>, recoupe
+                les pull requests techniques, explique les arbitrages du superviseur et prépare
+                la prochaine action sans vous obliger à reconstituer le contexte à la main dans GitHub.
               </p>
             </div>
 
@@ -80,10 +78,11 @@ export function HeroSection({
                   <span className="rounded-md bg-blue-50 p-2 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
                     <ServerCog className="size-5" />
                   </span>
-                  <h2 className="font-semibold">Comprendre le run</h2>
+                  <h2 className="font-semibold">Ce que RepoOps apporte</h2>
                 </div>
                 <p className="text-sm leading-6 text-muted-foreground">
-                  L’écran montre ce qui a été détecté, les décisions prises et ce qui reste à valider.
+                  L’écran regroupe les signaux épars de GitHub, hiérarchise les PR ouvertes et
+                  explique pourquoi une action mérite une revue.
                 </p>
               </div>
 
@@ -92,10 +91,11 @@ export function HeroSection({
                   <span className="rounded-md bg-emerald-50 p-2 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300">
                     <Sparkles className="size-5" />
                   </span>
-                  <h2 className="font-semibold">Par où commencer</h2>
+                  <h2 className="font-semibold">Comment le lire</h2>
                 </div>
                 <p className="text-sm leading-6 text-muted-foreground">
-                  Chargez d’abord un exemple complet, puis testez l’analyse réelle si le worker répond.
+                  Ouvrez d’abord le dépôt GitHub, puis lancez l’analyse pour comparer la vue brute
+                  GitHub avec la lecture priorisée de RepoOps.
                 </p>
               </div>
 
@@ -107,7 +107,8 @@ export function HeroSection({
                   <h2 className="font-semibold">Ce qui reste sous contrôle</h2>
                 </div>
                 <p className="text-sm leading-6 text-muted-foreground">
-                  Dry-run par défaut, pas d’opération Git depuis cette page et revue humaine conservée.
+                  Dry-run par défaut, aucune opération Git depuis la page et validation humaine conservée
+                  avant toute action sensible.
                 </p>
               </div>
             </div>
@@ -123,7 +124,8 @@ export function HeroSection({
             </p>
             <CardTitle>Piloter la démonstration</CardTitle>
             <CardDescription>
-              Utilisez les actions principales, puis relisez le run dans les cartes du tableau de bord.
+              Le scénario s’appuie sur un vrai dépôt GitHub public pour rendre les PR, les checks
+              et les recommandations immédiatement vérifiables.
             </CardDescription>
           </CardHeading>
         </CardHeader>
@@ -132,30 +134,31 @@ export function HeroSection({
             <div className="flex items-center gap-2">
               <Badge variant="info">Parcours recommandé</Badge>
               <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
-                1. Exemple · 2. Analyse · 3. Relecture
+                1. Dépôt GitHub · 2. Analyse RepoOps · 3. Relecture
               </p>
             </div>
             <p className="mt-2 text-sm leading-6 text-blue-900 dark:text-blue-100">
-              L’exemple remplit immédiatement le tableau de bord. L’analyse réelle vérifie ensuite la chaîne locale sans rompre le cadre dry-run.
+              Commencez par observer les PR ouvertes dans GitHub, puis lancez l’analyse pour voir
+              comment RepoOps les trie, les résume et prépare la suite.
             </p>
           </div>
 
           <div className="grid gap-3">
-            <Button
-              type="button"
-              size="lg"
-              className="h-auto min-w-0 items-start justify-between whitespace-normal px-5 py-4 text-left"
-              onClick={() => void onLoadMock()}
-              disabled={isBusy}
-            >
-              <span className="min-w-0 space-y-1 pr-3">
-                <span className="block text-base font-semibold">Charger un exemple</span>
-                <span className="block break-words text-sm font-normal text-primary-foreground/85">
-                  Remplit immédiatement la page avec un run réaliste et commenté.
+            <a href={demoRepositoryUrl} target="_blank" rel="noreferrer" className="inline-flex">
+              <Button
+                type="button"
+                size="lg"
+                className="h-auto min-w-0 flex-1 items-start justify-between whitespace-normal px-5 py-4 text-left"
+              >
+                <span className="min-w-0 space-y-1 pr-3">
+                  <span className="block text-base font-semibold">Ouvrir le dépôt GitHub</span>
+                  <span className="block break-words text-sm font-normal text-primary-foreground/85">
+                    Consultez les vraies branches et les vraies pull requests du scénario public.
+                  </span>
                 </span>
-              </span>
-              <PlayCircle className="mt-0.5 size-5 shrink-0" />
-            </Button>
+                <ExternalLink className="mt-0.5 size-5 shrink-0" />
+              </Button>
+            </a>
 
             <Button
               type="button"
@@ -167,10 +170,11 @@ export function HeroSection({
             >
               <span className="min-w-0 space-y-1 pr-3">
                 <span className="block text-base font-semibold">
-                  {isLoading ? "Analyse en cours..." : "Lancer une analyse réelle"}
+                  {isLoading ? "Analyse en cours..." : "Analyser le dépôt de démonstration"}
                 </span>
                 <span className="block break-words text-sm font-normal text-muted-foreground">
-                  Utilise l’API locale si elle répond, sinon la page bascule automatiquement sur le mock.
+                  Interroge le worker local pour reconstruire une lecture RepoOps claire à partir
+                  des PR réellement ouvertes.
                 </span>
               </span>
               <ArrowRight className={`mt-0.5 size-5 shrink-0 ${isLoading ? "animate-pulse" : ""}`} />

@@ -1,5 +1,8 @@
 import type { DeveloperLogEntry, LogLevel } from "./types";
 
+export const demoRepositorySlug = "arnaud-wissart/repoops-demo-weather-station";
+export const demoRepositoryUrl = `https://github.com/${demoRepositorySlug}`;
+
 export function formatDateTime(value?: string): string {
   if (!value) {
     return "non disponible";
@@ -53,7 +56,6 @@ export function detectScenarioLabel(
   criticalVulnerabilities: number,
   securityReviewExists: boolean,
   readyForMerge: number,
-  isMock?: boolean,
 ): string {
   if (criticalVulnerabilities > 0 && securityReviewExists) {
     return "Correction de vulnérabilité critique avec revue prioritaire";
@@ -67,11 +69,16 @@ export function detectScenarioLabel(
     return "Patch de dépendance prêt pour validation finale";
   }
 
-  if (isMock) {
-    return "Scénario de démonstration premium avec décisions explicables";
-  }
+  return "Cycle de maintenance réel sur le dépôt de démonstration";
+}
 
-  return "Cycle de maintenance standard avec tri des actions";
+export function resolvePrimaryRepository(scannedRepositories?: string[]): string {
+  const firstRepository = scannedRepositories?.find((repository) => repository.trim().length > 0);
+  return firstRepository ?? demoRepositorySlug;
+}
+
+export function toRepositoryUrl(repository: string): string {
+  return `https://github.com/${repository}`;
 }
 
 export function truncate(text: string, length = 220): string {

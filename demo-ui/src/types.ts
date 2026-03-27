@@ -1,6 +1,6 @@
 export type UiStatus = "idle" | "loading" | "success" | "error";
 
-export type DemoMode = "api" | "mock" | "auto";
+export type DemoMode = "api";
 
 export type PipelineStepKey =
   | "github"
@@ -260,7 +260,7 @@ export interface CodexExecutionResponse {
 }
 
 export interface DemoRunState {
-  source: "api" | "mock";
+  source: "api";
   report: MaintenanceRunReport;
   decisions: SupervisorDecisionResult;
   prompts: GeneratedPromptResult;

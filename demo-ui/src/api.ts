@@ -1,9 +1,7 @@
-import { mockDemoRunState } from "./mocks/demoData";
 import type {
   DeploymentExecutionResult,
   CodexExecutionResult,
   DemoMode,
-  DemoRunState,
   GeneratedPromptResult,
   MaintenanceRunReport,
   SupervisorDecisionResult,
@@ -25,15 +23,7 @@ const headers = {
 };
 
 const defaultTimeoutMs = Number(import.meta.env.VITE_DEMO_API_TIMEOUT_MS ?? 30000);
-const configuredMode = normalizeDemoMode(import.meta.env.VITE_DEMO_MODE);
-
-function normalizeDemoMode(value?: string): DemoMode {
-  if (value === "mock" || value === "auto" || value === "api") {
-    return value;
-  }
-
-  return "auto";
-}
+const configuredMode: DemoMode = "api";
 
 async function postJson<TRequest, TResponse>(
   path: string,
@@ -78,21 +68,13 @@ async function postJson<TRequest, TResponse>(
   }
 }
 
-function cloneMockState(): DemoRunState {
-  return JSON.parse(JSON.stringify(mockDemoRunState)) as DemoRunState;
-}
-
 export function getConfiguredDemoMode(): DemoMode {
   return configuredMode;
 }
 
-export function getMockDemoRunState(): DemoRunState {
-  return cloneMockState();
-}
-
 export async function runMaintenanceReport(): Promise<MaintenanceRunReport> {
   return postJson<RunMaintenancePayload, MaintenanceRunReport>("/maintenance/run", {
-    inputSource: "demo-ui",
+    inputSource: "demo-ui-live",
     triggerRenovateExecution: false,
   });
 }

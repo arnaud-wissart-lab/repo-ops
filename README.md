@@ -110,9 +110,14 @@ Elle reste volontairement en mode démonstration :
 - aucune pull request créée ;
 - aucune action irréversible.
 
-Elle peut aussi charger un scénario mock réaliste lorsque l’API locale n’est pas disponible.
 Le bouton de déploiement local appelle le worker, qui exécute une commande configurable sur la machine où il tourne.
 Ce bouton reste un outil de démonstration locale. Le flux principal de déploiement retenu pour `repo-ops` est désormais le workflow GitHub Actions manuel décrit dans [`docs/RUNBOOK.md`](./docs/RUNBOOK.md).
+
+La démo s’appuie maintenant sur un dépôt GitHub public réel :
+
+- `arnaud-wissart/repoops-demo-weather-station`
+
+Ce choix permet de montrer des PR, des checks et des liens réels, afin que la valeur de RepoOps soit lisible par rapport à une consultation GitHub classique.
 
 En déploiement `home`, la démo est publiée sur le port `8084`. Si un reverse proxy local comme Nginx Proxy Manager est utilisé, il doit cibler la machine hôte sur ce port, pas `127.0.0.1` depuis son propre conteneur.
 
@@ -656,18 +661,11 @@ L’URL de développement est généralement :
 http://127.0.0.1:5173
 ```
 
-Mode mock forcé :
-
-```powershell
-$env:VITE_DEMO_MODE="mock"
-npm run dev
-```
-
 Le bouton `Déployer en local` appelle `POST /deployment/run`.
 Il reste utile pour illustrer un déploiement local explicite quand le worker est lancé sur l’hôte via `dotnet run`.
 Le flux principal de déploiement reste toutefois le bouton GitHub Actions `Déploiement Manuel`, qui cible la machine personnelle via SSH et déploie le dépôt dans `/home/arnaud/apps/repo-ops`.
 
-En mode déployé sur votre machine, la démo frontend est désormais publiée localement sur `127.0.0.1:8084`, puis servie publiquement via `https://repoops.arnaudwissart.fr` par le reverse proxy déjà en place.
+En mode déployé sur votre machine, la démo frontend est désormais publiée localement sur `0.0.0.0:8084`, puis servie publiquement via `https://repoops.arnaudwissart.fr` par le reverse proxy déjà en place.
 
 ## CI et déploiement manuel via GitHub Actions
 
@@ -777,7 +775,7 @@ Exemple de configuration minimale pour une exécution locale ciblée :
 
 ```powershell
 $env:GITHUB_TOKEN="ghp_votre_jeton"
-$env:RENOVATE_REPOSITORIES="owner/repo-a,owner/repo-b"
+$env:RENOVATE_REPOSITORIES="arnaud-wissart/repoops-demo-weather-station"
 Invoke-WebRequest -Uri "http://127.0.0.1:8080/maintenance/run" -Method Post -ContentType "application/json" -Body '{"inputSource":"test-http","triggerRenovateExecution":false}' | Select-Object -ExpandProperty Content
 ```
 

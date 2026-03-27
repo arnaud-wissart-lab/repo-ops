@@ -14,6 +14,7 @@ export function DemoModeBadge() {
       <div className="flex items-center gap-2">
         <Badge variant="warning">Mode démonstration</Badge>
         <Badge variant="info">Dry-run</Badge>
+        <Badge variant="neutral">Dépôt public GitHub</Badge>
       </div>
 
       <div className="flex items-center gap-2">

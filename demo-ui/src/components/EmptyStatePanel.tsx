@@ -1,7 +1,8 @@
-import { Bot, EyeOff, PlayCircle, Radar, Rocket } from "lucide-react";
+import { Bot, EyeOff, GitPullRequest, Radar, Rocket } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardHeading, CardTitle } from "./ui/card";
+import { demoRepositorySlug } from "../utils";
 
 interface EmptyStatePanelProps {
   onDismiss?: () => void;
@@ -36,19 +37,19 @@ export function EmptyStatePanel({ onDismiss }: EmptyStatePanelProps) {
             <h3 className="font-semibold">1. Comprendre RepoOps</h3>
           </div>
           <p className="break-words text-sm leading-6 text-muted-foreground">
-            RepoOps suit un run de maintenance logicielle : collecte GitHub, qualification, décisions, prompts et synthèse.
+            RepoOps analyse un dépôt GitHub réel, regroupe les signaux utiles et transforme les PR techniques en priorités lisibles.
           </p>
         </article>
 
         <article className="surface-subtle h-full p-5">
           <div className="mb-4 flex items-center gap-3">
             <span className="rounded-md bg-emerald-50 p-2 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300">
-              <PlayCircle className="size-5" />
+              <GitPullRequest className="size-5" />
             </span>
-            <h3 className="font-semibold">2. Charger un exemple</h3>
+            <h3 className="font-semibold">2. Observer le dépôt analysé</h3>
           </div>
           <p className="break-words text-sm leading-6 text-muted-foreground">
-            Utilisez <strong>Charger un exemple</strong> pour remplir immédiatement le tableau de bord, même sans backend.
+            Le scénario de démonstration s’appuie sur <strong>{demoRepositorySlug}</strong> avec de vraies branches et de vraies pull requests ouvertes.
           </p>
         </article>
 
@@ -57,10 +58,10 @@ export function EmptyStatePanel({ onDismiss }: EmptyStatePanelProps) {
             <span className="rounded-md bg-violet-50 p-2 text-violet-600 dark:bg-violet-950/50 dark:text-violet-300">
               <Rocket className="size-5" />
             </span>
-            <h3 className="font-semibold">3. Tester le réel</h3>
+            <h3 className="font-semibold">3. Lancer l’analyse réelle</h3>
           </div>
           <p className="break-words text-sm leading-6 text-muted-foreground">
-            Lancez ensuite une analyse réelle si le worker local répond. Les actions sensibles restent protégées en dry-run.
+            Lancez l’analyse du worker pour voir ce que RepoOps priorise, pourquoi une PR est bloquée et quelle action il recommande ensuite.
           </p>
         </article>
       </CardContent>

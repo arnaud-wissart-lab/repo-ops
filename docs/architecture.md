@@ -58,12 +58,16 @@ Elle :
 
 - appelle les endpoints HTTP existants du worker ;
 - peut déclencher un déploiement local explicite sur la machine hôte configurée, pour la démonstration ;
-- peut fonctionner en mode API ou en mode mock ;
+- s’appuie sur un dépôt GitHub public réel de démonstration ;
 - reste en mode démonstration ;
 - n’exécute aucune opération Git ;
 - expose un pipeline visuel, des KPI, des décisions, des prompts, des logs et le JSON brut ;
 - ne remplace ni `n8n`, ni les flux CLI avancés ;
 - ne remplace pas le flux principal de déploiement GitHub Actions.
+
+Le dépôt de démonstration actuellement utilisé est :
+
+- `arnaud-wissart/repoops-demo-weather-station`
 
 Le flux principal de déploiement retenu pour `repo-ops` suit maintenant le même modèle que vos autres dépôts personnels :
 
@@ -71,7 +75,7 @@ Le flux principal de déploiement retenu pour `repo-ops` suit maintenant le mêm
 - workflow manuel `Déploiement Manuel` ;
 - script SSH [`scripts/deploy-home.sh`](../scripts/deploy-home.sh) ;
 - cible `/home/arnaud/apps/repo-ops` ;
-- exposition locale de la démo sur `127.0.0.1:8084` ;
+- exposition locale de la démo sur `0.0.0.0:8084` ;
 - vérification finale via `https://repoops.arnaudwissart.fr`.
 
 ### Worker .NET
@@ -377,7 +381,7 @@ Chaque override peut :
 - lancer un run sec depuis une page web ;
 - afficher les résultats consolidés ;
 - visualiser les décisions et les prompts ;
-- charger un scénario mock réaliste hors backend ;
+- montrer un scénario réel et cliquable, issu d’un dépôt GitHub public ;
 - donner une vue développeur sur les logs et le JSON brut ;
 - illustrer le comportement du système sans exposer de risque.
 
@@ -404,7 +408,7 @@ Chaque override peut :
 - le client `Stub` actuel ne produit pas de patch unifié, ce qui maintient les exécutions au niveau du dry-run ou du `skipped` contrôlé ;
 - la validation avant commit reste volontairement simple et repose principalement sur `dotnet build` quand un dépôt `.NET` est détecté ;
 - l’observabilité reste locale et n’expose pas encore de vue agrégée plus riche que l’historique JSON et la consultation CLI ;
-- l’UI de démonstration est un client local pour présentation et tests manuels ; elle ne constitue pas un portail d’administration complet et son mode mock reste statique ;
+- l’UI de démonstration est un client local pour présentation et tests manuels ; elle ne constitue pas un portail d’administration complet ;
 - l’intégration GitHub n'exploite pas encore les issues, les dépendances de sécurité ni l'historique détaillé d'exécution de Renovate ;
 - le bouton de déploiement local n’a de sens que si le worker tourne sur la machine cible ; exécuté dans un conteneur, il ne déploie que l’environnement du conteneur ;
 - le flux de déploiement réellement retenu passe donc par GitHub Actions et `scripts/deploy-home.sh`, pas par l’UI de démonstration ;

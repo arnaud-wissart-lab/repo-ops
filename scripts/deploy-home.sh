@@ -167,6 +167,7 @@ require_cmd git
 require_cmd docker
 require_cmd curl
 require_cmd base64
+require_cmd python3
 
 ensure_env_key() {
   local file_path="$1"
@@ -179,6 +180,33 @@ ensure_env_key() {
 
   printf '\n%s=%s\n' "$key" "$value" >> "$file_path"
   log "Variable ${key} absente du .env, valeur par défaut ajoutée: ${value}"
+}
+
+replace_placeholder_env_value() {
+  local file_path="$1"
+  local key="$2"
+  local placeholder_value="$3"
+  local target_value="$4"
+
+  if ! grep -qE "^${key}=${placeholder_value}$" "$file_path"; then
+    return
+  fi
+
+  python3 - <<'PY' "$file_path" "$key" "$placeholder_value" "$target_value"
+from pathlib import Path
+import sys
+
+file_path = Path(sys.argv[1])
+key = sys.argv[2]
+placeholder = sys.argv[3]
+target = sys.argv[4]
+
+content = file_path.read_text(encoding="utf-8")
+content = content.replace(f"{key}={placeholder}", f"{key}={target}")
+file_path.write_text(content, encoding="utf-8")
+PY
+
+  log "Variable ${key} remplacée par la valeur de démonstration par défaut."
 }
 
 log "Script distant initialisé."
@@ -249,6 +277,11 @@ fi
 
 ensure_env_key "$ENV_FILE_PATH" "DEMO_UI_PORT" "8084"
 ensure_env_key "$ENV_FILE_PATH" "DEMO_UI_BIND_ADDRESS" "0.0.0.0"
+replace_placeholder_env_value \
+  "$ENV_FILE_PATH" \
+  "RENOVATE_REPOSITORIES" \
+  "owner/repo-a,owner/repo-b" \
+  "arnaud-wissart/repoops-demo-weather-station"
 
 log "Validation de la configuration Compose"
 "${compose_cmd[@]}" --env-file "$ENV_FILE_PATH" -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE_PATH" config >/dev/null

@@ -4,7 +4,7 @@ import type {
   SupervisorDecisionResult,
 } from "../types";
 import { ArrowRightCircle, Bot, GitPullRequest, ShieldAlert, Wrench } from "lucide-react";
-import { detectScenarioLabel } from "../utils";
+import { detectScenarioLabel, resolvePrimaryRepository } from "../utils";
 import { StatusPill } from "./StatusPill";
 import { Badge } from "./ui/badge";
 import {
@@ -56,6 +56,7 @@ export function NarrativeSummary({
     securityReview,
     report.autoMerge.readyForMerge.length,
   );
+  const primaryRepository = resolvePrimaryRepository(report.summary.scannedRepositories);
 
   return (
     <Card className="section-enter">
@@ -72,6 +73,9 @@ export function NarrativeSummary({
       <CardContent className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
         <div className="surface-subtle p-5">
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Analyse terminée</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Dépôt analysé : <strong>{primaryRepository}</strong>
+          </p>
           <ul className="mt-4 space-y-3 text-sm text-foreground">
             <li className="flex items-center gap-3">
               <GitPullRequest className="size-4 text-primary" />

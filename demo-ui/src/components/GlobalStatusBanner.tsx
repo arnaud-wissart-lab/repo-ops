@@ -1,6 +1,6 @@
 import type { MaintenanceRunReport } from "../types";
 import { AlertCircle, CheckCircle2, Clock3, ShieldAlert, TriangleAlert } from "lucide-react";
-import { formatDateTime, formatDuration, formatRelativeTime } from "../utils";
+import { formatDateTime, formatDuration, formatRelativeTime, resolvePrimaryRepository } from "../utils";
 import { StatusPill } from "./StatusPill";
 import { Badge } from "./ui/badge";
 import { Card, CardContent } from "./ui/card";
@@ -25,6 +25,7 @@ function toneFromStatus(status: string): "done" | "warning" | "failed" {
 
 export function GlobalStatusBanner({ report }: GlobalStatusBannerProps) {
   const durationLabel = formatDuration(report.observability?.durationMilliseconds);
+  const primaryRepository = resolvePrimaryRepository(report.summary.scannedRepositories);
   const normalizedStatus = report.summary.status.toLowerCase();
   const headline =
     normalizedStatus === "success"
@@ -63,7 +64,7 @@ export function GlobalStatusBanner({ report }: GlobalStatusBannerProps) {
               <div>
                 <h2 className="text-2xl font-semibold text-foreground">{headline}</h2>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-                  Le pipeline est maintenant consolidé. Vous pouvez relire le diagnostic, les décisions et la sortie technique sans changer d’écran.
+                  Le pipeline est maintenant consolidé pour <strong>{primaryRepository}</strong>. Vous pouvez relire le diagnostic, les décisions et la sortie technique sans changer d’écran.
                 </p>
               </div>
             </div>

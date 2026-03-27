@@ -4,7 +4,13 @@ import type {
   SupervisorDecisionResult,
 } from "../types";
 import { ClipboardList, Clock3, ShieldCheck, Sparkles } from "lucide-react";
-import { detectScenarioLabel, formatDateTime, formatDuration, formatRelativeTime } from "../utils";
+import {
+  detectScenarioLabel,
+  formatDateTime,
+  formatDuration,
+  formatRelativeTime,
+  resolvePrimaryRepository,
+} from "../utils";
 import { StatusPill } from "./StatusPill";
 import { Badge } from "./ui/badge";
 import {
@@ -43,6 +49,7 @@ export function RunSummary({ report, decisions, codex }: RunSummaryProps) {
     decisions.actions.some((action) => action.isSecurityRelated),
     report.autoMerge.readyForMerge.length,
   );
+  const primaryRepository = resolvePrimaryRepository(report.summary.scannedRepositories);
 
   return (
     <Card className="section-enter">
@@ -66,6 +73,7 @@ export function RunSummary({ report, decisions, codex }: RunSummaryProps) {
               <span className="text-xs font-semibold uppercase tracking-[0.16em]">Scénario</span>
             </div>
             <strong className="block text-sm font-semibold text-foreground">{scenario}</strong>
+            <span className="text-xs text-muted-foreground">{primaryRepository}</span>
           </div>
           <div className="surface-subtle p-4">
             <div className="mb-2 flex items-center gap-2 text-muted-foreground">
@@ -89,7 +97,7 @@ export function RunSummary({ report, decisions, codex }: RunSummaryProps) {
               <span className="text-xs font-semibold uppercase tracking-[0.16em]">Source</span>
             </div>
             <strong className="block text-sm font-semibold text-foreground">{report.summary.inputSource}</strong>
-            <span className="text-xs text-muted-foreground">Revue humaine conservée</span>
+            <span className="text-xs text-muted-foreground">Dépôt analysé : {primaryRepository}</span>
           </div>
         </div>
 
@@ -101,7 +109,7 @@ export function RunSummary({ report, decisions, codex }: RunSummaryProps) {
             </div>
             <p className="text-base font-semibold text-foreground">{report.digest.subject}</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Run du {formatDateTime(report.summary.runDateUtc)} via <strong>{report.summary.inputSource}</strong>
+              Run du {formatDateTime(report.summary.runDateUtc)} via <strong>{report.summary.inputSource}</strong> sur <strong>{primaryRepository}</strong>
             </p>
             <pre className="mt-4 whitespace-pre-wrap rounded-lg border border-border bg-white/60 p-4 text-sm leading-6 text-foreground dark:bg-black/10">
               {report.digest.plainTextBody}

@@ -5,11 +5,9 @@ import {
   buildSupervisorPrompts,
   executeCodexPrompts,
   getConfiguredDemoMode,
-  getMockDemoRunState,
   runLocalDeployment,
   runMaintenanceReport,
 } from "./api";
-import { mockDeploymentExecutionResult } from "./mocks/demoData";
 import { DecisionSection } from "./components/DecisionSection";
 import { DemoModeBadge } from "./components/DemoModeBadge";
 import { DeveloperPanel } from "./components/DeveloperPanel";
@@ -45,8 +43,10 @@ import type {
 import {
   createDerivedLogEntries,
   createLogEntry,
+  demoRepositorySlug,
   detectScenarioLabel,
   formatRelativeTime,
+  resolvePrimaryRepository,
 } from "./utils";
 
 const configuredMode = getConfiguredDemoMode();
@@ -156,30 +156,14 @@ export default function App() {
     setStepState(step, finalState);
   }
 
-  async function executeMockScenario() {
-    appendLog(createLogEntry("INFO", "ui", "Chargement d’un scénario mock réaliste."));
-    const mockRun = getMockDemoRunState();
-
-    await animateStep("github", "warning", 240);
-    await animateStep("analysis", reportTone(mockRun.report), 200);
-    await animateStep("decision", "done", 180);
-    await animateStep("prompts", "done", 180);
-    await animateStep("codex", "done", 220);
-    await animateStep("validation", "warning", 120);
-    await animateStep("result", "done", 120);
-
-    setRun(mockRun);
-    setLogs((current) => [
-      ...current,
-      ...createDerivedLogEntries("worker", mockRun.report.messages.logs),
-      ...createDerivedLogEntries("worker", mockRun.report.messages.notes),
-      createLogEntry("WARN", "supervisor", "Validation humaine encore requise avant toute exécution."),
-      createLogEntry("INFO", "ui", "Le scénario mock a été chargé avec succès."),
-    ]);
-  }
-
   async function executeApiScenario() {
-    appendLog(createLogEntry("INFO", "ui", "Déclenchement HTTP du worker RepoOps."));
+    appendLog(
+      createLogEntry(
+        "INFO",
+        "ui",
+        `Déclenchement HTTP du worker RepoOps pour ${demoRepositorySlug}.`,
+      ),
+    );
 
     setStepState("github", "running");
     await wait(140);
@@ -265,30 +249,7 @@ export default function App() {
     setActiveMode(mode);
 
     try {
-      if (mode === "mock") {
-        await executeMockScenario();
-      } else if (mode === "auto") {
-        try {
-          await executeApiScenario();
-        } catch (apiError) {
-          appendLog(
-            createLogEntry(
-              "WARN",
-              "ui",
-              "API indisponible, bascule automatique vers le scénario mock.",
-            ),
-          );
-          await executeMockScenario();
-
-          if (apiError instanceof Error) {
-            setError(
-              `L’API locale n’a pas répondu. La démo a basculé sur un exemple mock. Détail : ${apiError.message}`,
-            );
-          }
-        }
-      } else {
-        await executeApiScenario();
-      }
+      await executeApiScenario();
 
       setStatus("success");
     } catch (caughtError) {
@@ -311,38 +272,13 @@ export default function App() {
     }
   }
 
-  async function executeDeployment(mode: DemoMode) {
+  async function executeDeployment(_mode: DemoMode) {
     setDeploymentStatus("loading");
     setDeploymentError("");
     setDeploymentResult(null);
 
     try {
-      let result: DeploymentExecutionResult;
-
-      if (mode === "mock") {
-        result = structuredClone(mockDeploymentExecutionResult);
-      } else if (mode === "auto") {
-        try {
-          result = await runLocalDeployment();
-        } catch (apiError) {
-          appendLog(
-            createLogEntry(
-              "WARN",
-              "deployment",
-              "API de déploiement indisponible, bascule automatique vers le scénario mock.",
-            ),
-          );
-          result = structuredClone(mockDeploymentExecutionResult);
-
-          if (apiError instanceof Error) {
-            setDeploymentError(
-              `L’API de déploiement locale n’a pas répondu. La démonstration a basculé sur un exemple mock. Détail : ${apiError.message}`,
-            );
-          }
-        }
-      } else {
-        result = await runLocalDeployment();
-      }
+      const result = await runLocalDeployment();
 
       setDeploymentResult(result);
       setDeploymentStatus(result.status.toLowerCase() === "failed" ? "error" : "success");
@@ -394,15 +330,17 @@ export default function App() {
     0;
 
   const proposedActions = decisions?.summary.totalActions ?? 0;
+  const primaryRepository = report
+    ? resolvePrimaryRepository(report.summary.scannedRepositories)
+    : demoRepositorySlug;
   const scenarioLabel = report
     ? detectScenarioLabel(
         report.pullRequestStatuses.failedChecks.length,
         report.vulnerabilities.criticalCount,
         decisions?.actions.some((action) => action.isSecurityRelated) ?? false,
         report.autoMerge.readyForMerge.length,
-        run?.source === "mock",
       )
-    : "Scénario de démonstration prêt à être lancé";
+    : "Dépôt public prêt à être analysé par RepoOps";
 
   return (
     <div className="app-shell">
@@ -428,11 +366,15 @@ export default function App() {
             <p className="page-toolbar-kicker">Dashboard</p>
             <h1 className="page-toolbar-title">Centre de supervision RepoOps</h1>
             <p className="page-toolbar-description">
-              Visualisez comment RepoOps agrège les signaux GitHub, prépare des décisions explicables et organise la relecture d’un run sans passer par les logs bruts.
+              Visualisez comment RepoOps agrège les signaux GitHub du dépôt de démonstration, prépare des décisions explicables et organise la relecture d’un run sans passer par les logs bruts.
             </p>
           </div>
 
           <div className="page-toolbar-meta">
+            <div className="toolbar-metric">
+              <span className="toolbar-metric-label">Dépôt analysé</span>
+              <strong className="toolbar-metric-value">{primaryRepository}</strong>
+            </div>
             <div className="toolbar-metric">
               <span className="toolbar-metric-label">Scénario</span>
               <strong className="toolbar-metric-value">{scenarioLabel}</strong>
@@ -463,7 +405,7 @@ export default function App() {
                   <div className="space-y-1">
                     <p className="text-sm font-semibold text-foreground">Guide rapide masqué</p>
                     <p className="text-sm text-muted-foreground">
-                      Réaffichez-le si vous souhaitez rappeler le parcours recommandé.
+                      Réaffichez-le si vous souhaitez rappeler comment lire le scénario GitHub de démonstration.
                     </p>
                   </div>
                 </div>
@@ -486,7 +428,6 @@ export default function App() {
           deploymentResult={deploymentResult}
           deploymentError={deploymentError}
           onRun={() => executeScenario(configuredMode)}
-          onLoadMock={() => executeScenario("mock")}
           onDeploy={() => executeDeployment(configuredMode)}
         />
 
@@ -547,7 +488,7 @@ export default function App() {
                     </div>
                     <CardTitle>Ce que la page affichera ensuite</CardTitle>
                     <CardDescription>
-                      Le tableau de bord complet n’apparaît qu’après le premier scénario, pour éviter un écran vide difficile à lire.
+                      Le tableau de bord complet n’apparaît qu’après la première analyse du dépôt public, pour éviter un écran vide difficile à lire.
                     </CardDescription>
                   </CardHeading>
                 </CardHeader>
@@ -555,9 +496,9 @@ export default function App() {
                   <div className="empty-state-block">
                     <p className="font-semibold text-foreground">Après le premier run, vous verrez :</p>
                     <ul className="mt-3 space-y-2 text-sm leading-6 text-muted-foreground">
-                      <li>un résumé métier immédiat ;</li>
-                      <li>les KPI du run et la timeline complète ;</li>
-                      <li>les décisions, prompts et logs techniques.</li>
+                      <li>quelles PR GitHub méritent votre attention immédiate ;</li>
+                      <li>pourquoi RepoOps les qualifie ainsi ;</li>
+                      <li>quels prompts et quelles validations restent utiles ensuite.</li>
                     </ul>
                   </div>
                 </CardContent>

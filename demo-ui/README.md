@@ -1,10 +1,10 @@
 # Démo web repo-ops
 
-Cette interface fournit une démonstration visuelle du pipeline `repo-ops` dans un format lisible, professionnel et sûr. Elle s’appuie désormais sur une base visuelle inspirée de Metronic, avec un thème clair par défaut, un sélecteur de thème et une hiérarchie de cartes plus proche d’un produit de supervision technique que d’un simple dashboard custom.
+Cette interface fournit une démonstration visuelle du pipeline `repo-ops` dans un format lisible, professionnel et sûr. Elle s’appuie désormais sur le dépôt GitHub public réel `arnaud-wissart/repoops-demo-weather-station`, afin de montrer une valeur concrète par rapport à une lecture GitHub brute. La base visuelle suit une hiérarchie inspirée de Metronic, avec un thème clair par défaut et un sélecteur de thème intégré.
 
 ## Ce que montre la page
 
-- déclenchement d’un run HTTP du worker ;
+- déclenchement d’un run HTTP du worker sur un dépôt GitHub réel ;
 - visualisation du pipeline `GitHub -> Analyse -> Décision -> Prompts -> Codex -> Validation -> Résultat` ;
 - affichage du résumé exécutif ;
 - affichage d’un bloc narratif “Ce que le système a fait” ;
@@ -14,7 +14,6 @@ Cette interface fournit une démonstration visuelle du pipeline `repo-ops` dans 
 - affichage des prompts générés ;
 - déclenchement d’un déploiement local explicite via le worker ;
 - affichage d’un panneau développeur avec logs et JSON brut ;
-- chargement d’un scénario mock réaliste si le backend n’est pas disponible ;
 - sélecteur de thème `Clair / Sombre / Auto`.
 
 La page n’exécute pas :
@@ -38,7 +37,6 @@ En environnement déployé, la démo est maintenant servie par un conteneur Ngin
 
 - [`src/App.tsx`](./src/App.tsx) : orchestration du scénario et états principaux ;
 - [`src/api.ts`](./src/api.ts) : appels HTTP et gestion du timeout ;
-- [`src/mocks/demoData.ts`](./src/mocks/demoData.ts) : scénario mock réaliste ;
 - [`src/components`](./src/components) : composants de présentation ;
 - [`src/components/ui`](./src/components/ui) : primitives visuelles de base inspirées de Metronic ;
 - [`src/lib/utils.ts`](./src/lib/utils.ts) : helper de fusion de classes Tailwind ;
@@ -47,8 +45,8 @@ En environnement déployé, la démo est maintenant servie par un conteneur Ngin
 ## Prérequis
 
 - `Node.js` 20 ou plus récent ;
-- le worker `.NET` démarré localement sur `http://127.0.0.1:8080` si vous voulez tester le mode API ;
-- un environnement `repo-ops` configuré si vous souhaitez une collecte GitHub utile.
+- le worker `.NET` démarré localement sur `http://127.0.0.1:8080` ;
+- un environnement `repo-ops` configuré avec `GITHUB_TOKEN` et `RENOVATE_REPOSITORIES` pointant vers `arnaud-wissart/repoops-demo-weather-station`.
 
 ## Lancement
 
@@ -79,9 +77,9 @@ http://127.0.0.1:5173
 
 ## Parcours conseillé
 
-1. Cliquer sur `Charger un exemple` pour afficher immédiatement un run complet et comprendre le rôle de l’application.
-2. Relire le bloc `Ce que le système a fait`, puis le pipeline et les décisions.
-3. Utiliser ensuite `Lancer une analyse réelle` si le worker local est disponible.
+1. Ouvrir le dépôt GitHub public de démonstration depuis la zone d’actions.
+2. Lancer `Analyser le dépôt de démonstration`.
+3. Relire le bloc `Ce que le système a fait`, puis le pipeline, les décisions et les prompts.
 4. Consulter enfin `Sortie technique (mode développeur)` pour les logs et le JSON.
 
 ## Configuration de l’URL API
@@ -98,28 +96,6 @@ Pour viser une autre URL du worker :
 
 ```powershell
 $env:VITE_DEMO_PROXY_TARGET="http://127.0.0.1:8081"
-npm run dev
-```
-
-## Mode mock
-
-Deux mécanismes sont prévus :
-
-- le bouton `Charger un exemple`, qui force un scénario mock ;
-- la variable `VITE_DEMO_MODE`, utile pour démarrer directement la démo dans un mode donné.
-
-Valeurs supportées :
-
-- `api` : la page utilise l’API locale ;
-- `mock` : la page charge directement le scénario mock ;
-- `auto` : la page tente l’API, puis peut basculer vers le mock si l’appel échoue.
-
-Le mode par défaut retenu pour la démo publique est `auto`, afin d’éviter une page bloquée si l’API locale n’est pas disponible ou mal routée.
-
-Exemple :
-
-```powershell
-$env:VITE_DEMO_MODE="mock"
 npm run dev
 ```
 
@@ -144,6 +120,7 @@ npm run build
 - sélecteur de thème `Clair / Sombre / Auto` pour éviter d’imposer un rendu sombre ;
 - lecture narrative immédiate après le run ;
 - contexte de scénario et de durée visible sans ouvrir les détails ;
+- dépôt GitHub analysé visible dans les cartes clés ;
 - lecture rapide des KPI principaux ;
 - pipeline vertical immédiatement compréhensible ;
 - panneau développeur valorisant pour la lecture technique ;
@@ -154,5 +131,5 @@ npm run build
 
 - l’interface reste un client de démonstration local ;
 - elle dépend des endpoints déjà présents dans le worker pour le mode API ;
-- le mode mock est crédible mais reste statique ;
+- elle suppose que le worker puisse joindre GitHub pour produire un run réellement parlant ;
 - elle ne remplace ni `n8n`, ni l’historique complet des runs, ni les flux CLI avancés de validation et d’exécution.

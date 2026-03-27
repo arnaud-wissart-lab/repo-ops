@@ -1,8 +1,6 @@
 export type UiStatus = "idle" | "loading" | "success" | "error";
 
 export type DemoMode = "api" | "mock" | "auto";
-export type ThemePreference = "light" | "dark" | "auto";
-export type ResolvedTheme = "light" | "dark";
 
 export type PipelineStepKey =
   | "github"

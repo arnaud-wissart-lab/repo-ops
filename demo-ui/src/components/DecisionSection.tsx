@@ -1,5 +1,16 @@
 import type { SupervisorAction } from "../types";
+import { ArrowUpRight, GitPullRequest, ShieldAlert } from "lucide-react";
 import { StatusPill } from "./StatusPill";
+import { Badge } from "./ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardHeading,
+  CardTitle,
+} from "./ui/card";
+import { Button } from "./ui/button";
 
 interface DecisionSectionProps {
   actions: SupervisorAction[];
@@ -7,24 +18,23 @@ interface DecisionSectionProps {
 
 function typeMeta(type: string): {
   label: string;
-  icon: string;
-  tone: "done" | "warning" | "failed" | "neutral";
+  badge: "success" | "warning" | "danger" | "neutral";
 } {
   const normalized = type.toLowerCase();
 
   if (normalized === "automergeeligible") {
-    return { label: "Auto-merge éligible", icon: "AM", tone: "done" };
+    return { label: "Auto-merge éligible", badge: "success" };
   }
 
   if (normalized === "fixrequired") {
-    return { label: "Correctif requis", icon: "FX", tone: "failed" };
+    return { label: "Correctif requis", badge: "danger" };
   }
 
   if (normalized === "review") {
-    return { label: "Revue", icon: "RV", tone: "warning" };
+    return { label: "Revue", badge: "warning" };
   }
 
-  return { label: "Ignoré", icon: "IG", tone: "neutral" };
+  return { label: "Ignoré", badge: "neutral" };
 }
 
 function toneFromPriority(priority: string): "done" | "warning" | "failed" | "neutral" {
@@ -47,85 +57,112 @@ function toneFromPriority(priority: string): "done" | "warning" | "failed" | "ne
 
 export function DecisionSection({ actions }: DecisionSectionProps) {
   return (
-    <section className="panel panel-reveal">
-      <div className="panel-header">
-        <div>
-          <p className="section-kicker">Décisions</p>
-          <h2>Pourquoi ces décisions</h2>
-        </div>
-        <p className="subtle-text">
-          Le moteur de décision reste explicable. Rien n’est exécuté depuis
-          cette vue.
-        </p>
-      </div>
+    <Card className="section-enter">
+      <CardHeader>
+        <CardHeading>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Décisions</p>
+          <CardTitle>Pourquoi ces décisions</CardTitle>
+          <CardDescription>
+            Le moteur reste explicable. Chaque carte montre la cible, la priorité et la raison métier.
+          </CardDescription>
+        </CardHeading>
+      </CardHeader>
+      <CardContent>
+        {actions.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-border bg-secondary/50 p-6 text-sm text-muted-foreground">
+            Aucune action structurée n’a été produite pour ce scénario.
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            {actions.map((action) => {
+              const meta = typeMeta(action.type);
 
-      {actions.length === 0 ? (
-        <p className="empty-state">
-          Aucune action structurée n’a été produite pour ce scénario.
-        </p>
-      ) : (
-        <div className="decision-list">
-          {actions.map((action) => (
-            <article
-              key={`${action.repository}-${action.pullRequestNumber ?? "repo"}-${action.type}`}
-              className={`decision-card decision-card-${typeMeta(action.type).tone}`}
-            >
-              <div className="decision-topline">
-                <div>
-                  <div className="decision-badges">
-                    <span className={`decision-type-badge decision-type-badge-${typeMeta(action.type).tone}`}>
-                      <span className="decision-type-icon">{typeMeta(action.type).icon}</span>
-                      <span>{typeMeta(action.type).label}</span>
-                    </span>
-                    {action.isSecurityRelated ? (
-                      <span className="decision-security-badge">
-                        SEC {action.securitySeverity || "prioritaire"}
-                      </span>
-                    ) : null}
+              return (
+                <article
+                  key={`${action.repository}-${action.pullRequestNumber ?? "repo"}-${action.type}`}
+                  className="rounded-2xl border border-border/80 bg-card/80 p-5 transition-transform duration-200 hover:-translate-y-0.5"
+                >
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant={meta.badge}>{meta.label}</Badge>
+                        <StatusPill label={action.priority} tone={toneFromPriority(action.priority)} />
+                        {action.isSecurityRelated ? (
+                          <Badge variant="danger">
+                            <ShieldAlert className="size-3.5" />
+                            Sécurité {action.securitySeverity || "prioritaire"}
+                          </Badge>
+                        ) : null}
+                      </div>
+
+                      <div className="space-y-1">
+                        <h3 className="text-lg font-semibold tracking-tight text-foreground">
+                          {action.pullRequestNumber ? `PR #${action.pullRequestNumber}` : action.repository} — {meta.label}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {action.pullRequestTitle ?? "Action structurée au niveau dépôt"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2 lg:min-w-72">
+                      <div className="rounded-xl border border-border/70 bg-secondary/50 px-3 py-2">
+                        <span className="block text-[11px] font-semibold uppercase tracking-[0.16em]">Type</span>
+                        <strong className="text-sm font-semibold text-foreground">{meta.label}</strong>
+                      </div>
+                      <div className="rounded-xl border border-border/70 bg-secondary/50 px-3 py-2">
+                        <span className="block text-[11px] font-semibold uppercase tracking-[0.16em]">Priorité</span>
+                        <strong className="text-sm font-semibold text-foreground">{action.priority}</strong>
+                      </div>
+                      <div className="rounded-xl border border-border/70 bg-secondary/50 px-3 py-2 sm:col-span-2">
+                        <span className="block text-[11px] font-semibold uppercase tracking-[0.16em]">Cible</span>
+                        <strong className="text-sm font-semibold text-foreground">{action.repository}</strong>
+                      </div>
+                    </div>
                   </div>
-                  <h3>
-                    {action.pullRequestNumber ? `PR #${action.pullRequestNumber}` : action.repository}{" "}
-                    — {typeMeta(action.type).label.toUpperCase()}
-                  </h3>
-                  <p className="decision-title-caption">
-                    {action.pullRequestTitle ?? "Action structurée au niveau dépôt"}
-                  </p>
-                </div>
-                <StatusPill label={action.priority} tone={toneFromPriority(action.priority)} />
-              </div>
 
-              <div className="decision-meta">
-                <span>Cible : {action.repository}</span>
-                {action.pullRequestNumber ? <span>PR #{action.pullRequestNumber}</span> : null}
-                {action.checksStatus ? <span>Checks : {action.checksStatus}</span> : null}
-                <span>Type : {typeMeta(action.type).label}</span>
-              </div>
+                  <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)]">
+                    <div className="rounded-2xl border border-border/70 bg-secondary/40 p-4">
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        Raison
+                      </p>
+                      <p className="text-sm leading-6 text-foreground">{action.reason}</p>
+                    </div>
 
-              <div className="decision-section-block">
-                <p className="decision-section-title">Raison</p>
-                <ul className="detail-list compact-list">
-                  <li>{action.reason}</li>
-                </ul>
-              </div>
+                    <div className="rounded-2xl border border-border/70 bg-secondary/40 p-4">
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        Action suggérée
+                      </p>
+                      <p className="text-sm leading-6 text-foreground">
+                        {action.recommendation || "Aucune recommandation supplémentaire."}
+                      </p>
+                    </div>
+                  </div>
 
-              {action.recommendation ? (
-                <div className="decision-section-block">
-                  <p className="decision-section-title">Action suggérée</p>
-                  <ul className="detail-list compact-list">
-                    <li className="recommendation-text">{action.recommendation}</li>
-                  </ul>
-                </div>
-              ) : null}
+                  <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1">
+                      <GitPullRequest className="size-3.5" />
+                      {action.pullRequestNumber ? `PR #${action.pullRequestNumber}` : "Niveau dépôt"}
+                    </span>
+                    {action.checksStatus ? <span>Checks : {action.checksStatus}</span> : null}
+                  </div>
 
-              {action.pullRequestUrl ? (
-                <a href={action.pullRequestUrl} target="_blank" rel="noreferrer">
-                  Ouvrir la pull request source
-                </a>
-              ) : null}
-            </article>
-          ))}
-        </div>
-      )}
-    </section>
+                  {action.pullRequestUrl ? (
+                    <div className="mt-4">
+                      <Button asChild variant="secondary" size="sm">
+                        <a href={action.pullRequestUrl} target="_blank" rel="noreferrer">
+                          Ouvrir la pull request source
+                          <ArrowUpRight className="size-4" />
+                        </a>
+                      </Button>
+                    </div>
+                  ) : null}
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

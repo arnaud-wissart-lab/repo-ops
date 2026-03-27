@@ -3,8 +3,18 @@ import type {
   MaintenanceRunReport,
   SupervisorDecisionResult,
 } from "../types";
+import { ClipboardList, Clock3, ShieldCheck, Sparkles } from "lucide-react";
 import { detectScenarioLabel, formatDateTime, formatDuration, formatRelativeTime } from "../utils";
 import { StatusPill } from "./StatusPill";
+import { Badge } from "./ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardHeading,
+  CardTitle,
+} from "./ui/card";
 
 interface RunSummaryProps {
   report: MaintenanceRunReport;
@@ -35,96 +45,131 @@ export function RunSummary({ report, decisions, codex }: RunSummaryProps) {
   );
 
   return (
-    <section className="panel panel-reveal">
-      <div className="panel-header">
-        <div>
-          <p className="section-kicker">Synthèse</p>
-          <h2>Résumé exécutif du run</h2>
-        </div>
-        <StatusPill label={report.summary.status} tone={statusTone(report.summary.status)} />
-      </div>
-
-      <div className="run-context-banner">
-        <div>
-          <span>Scénario</span>
-          <strong>{scenario}</strong>
-        </div>
-        <div>
-          <span>Dernière exécution</span>
-          <strong>{formatRelativeTime(report.summary.runDateUtc)}</strong>
-        </div>
-        <div>
-          <span>Durée</span>
-          <strong>{formatDuration(report.observability?.durationMilliseconds)}</strong>
-        </div>
-        <div>
-          <span>Mode</span>
-          <strong>Démonstration / dry-run</strong>
-        </div>
-      </div>
-
-      <div className="summary-grid">
-        <article className="summary-card">
-          <h3>Résultat métier immédiat</h3>
-          <p className="summary-lead">{report.digest.subject}</p>
-          <p className="subtle-text">
-            Run du {formatDateTime(report.summary.runDateUtc)} via{" "}
-            <strong>{report.summary.inputSource}</strong>
-          </p>
-          <pre>{report.digest.plainTextBody}</pre>
-        </article>
-
-        <article className="summary-card">
-          <h3>Messages importants</h3>
-          <ul className="detail-list">
-            {report.messages.notes.map((note) => (
-              <li key={note}>{note}</li>
-            ))}
-            {report.recommendations.manualActions.map((action) => (
-              <li key={action}>{action}</li>
-            ))}
-          </ul>
-        </article>
-
-        <article className="summary-card">
-          <h3>Lecture rapide</h3>
-          <div className="summary-stats">
-            <div>
-              <span>Sécurité</span>
-              <strong>{report.vulnerabilities.status}</strong>
-            </div>
-            <div>
-              <span>Renovate</span>
-              <strong>{report.renovateExecution?.status ?? "non disponible"}</strong>
-            </div>
-            <div>
-              <span>Décisions</span>
-              <strong>{decisions.summary.totalActions}</strong>
-            </div>
-            <div>
-              <span>Réponses Codex</span>
-              <strong>{codex.summary.totalResponses}</strong>
-            </div>
+    <Card className="section-enter">
+      <CardHeader>
+        <CardHeading>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <Badge variant="neutral">Synthèse</Badge>
+            <StatusPill label={report.summary.status} tone={statusTone(report.summary.status)} />
           </div>
-        </article>
+          <CardTitle>Résumé exécutif du run</CardTitle>
+          <CardDescription>
+            Ce bloc rassemble le contexte, les messages importants et le résultat métier immédiat.
+          </CardDescription>
+        </CardHeading>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-2xl border border-border/70 bg-secondary/50 p-4">
+            <div className="mb-2 flex items-center gap-2 text-muted-foreground">
+              <ClipboardList className="size-4" />
+              <span className="text-xs font-semibold uppercase tracking-[0.16em]">Scénario</span>
+            </div>
+            <strong className="block text-sm font-semibold text-foreground">{scenario}</strong>
+          </div>
+          <div className="rounded-2xl border border-border/70 bg-secondary/50 p-4">
+            <div className="mb-2 flex items-center gap-2 text-muted-foreground">
+              <Clock3 className="size-4" />
+              <span className="text-xs font-semibold uppercase tracking-[0.16em]">Dernière exécution</span>
+            </div>
+            <strong className="block text-sm font-semibold text-foreground">{formatRelativeTime(report.summary.runDateUtc)}</strong>
+            <span className="text-xs text-muted-foreground">{formatDateTime(report.summary.runDateUtc)}</span>
+          </div>
+          <div className="rounded-2xl border border-border/70 bg-secondary/50 p-4">
+            <div className="mb-2 flex items-center gap-2 text-muted-foreground">
+              <Clock3 className="size-4" />
+              <span className="text-xs font-semibold uppercase tracking-[0.16em]">Durée</span>
+            </div>
+            <strong className="block text-sm font-semibold text-foreground">{formatDuration(report.observability?.durationMilliseconds)}</strong>
+            <span className="text-xs text-muted-foreground">Mode démonstration / dry-run</span>
+          </div>
+          <div className="rounded-2xl border border-border/70 bg-secondary/50 p-4">
+            <div className="mb-2 flex items-center gap-2 text-muted-foreground">
+              <ShieldCheck className="size-4" />
+              <span className="text-xs font-semibold uppercase tracking-[0.16em]">Source</span>
+            </div>
+            <strong className="block text-sm font-semibold text-foreground">{report.summary.inputSource}</strong>
+            <span className="text-xs text-muted-foreground">Revue humaine conservée</span>
+          </div>
+        </div>
 
-        <article className="summary-card">
-          <h3>Réponses proposées par le système</h3>
-          <ul className="detail-list">
-            {codex.responses.length === 0 ? (
-              <li>Aucune réponse structurée disponible.</li>
-            ) : (
-              codex.responses.map((response) => (
-                <li key={response.actionId}>
-                  <strong>{response.repository}</strong>
-                  {response.pullRequestNumber ? ` #${response.pullRequestNumber}` : ""} :
-                  {" "}{response.summary}
+        <div className="grid gap-4 xl:grid-cols-2">
+          <article className="rounded-2xl border border-border/70 bg-card/80 p-5">
+            <div className="mb-4 flex items-center gap-2">
+              <Sparkles className="size-4 text-primary" />
+              <h3 className="text-base font-semibold tracking-tight">Résultat métier immédiat</h3>
+            </div>
+            <p className="text-base font-semibold text-foreground">{report.digest.subject}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Run du {formatDateTime(report.summary.runDateUtc)} via <strong>{report.summary.inputSource}</strong>
+            </p>
+            <pre className="mt-4 whitespace-pre-wrap rounded-2xl border border-border/70 bg-secondary/40 p-4 text-sm leading-6 text-foreground">
+              {report.digest.plainTextBody}
+            </pre>
+          </article>
+
+          <article className="rounded-2xl border border-border/70 bg-card/80 p-5">
+            <div className="mb-4 flex items-center gap-2">
+              <ClipboardList className="size-4 text-primary" />
+              <h3 className="text-base font-semibold tracking-tight">Messages importants</h3>
+            </div>
+            <ul className="space-y-3 text-sm leading-6 text-foreground">
+              {report.messages.notes.map((note) => (
+                <li key={note} className="rounded-xl border border-border/60 bg-secondary/40 px-4 py-3">
+                  {note}
                 </li>
-              ))
-            )}
-          </ul>
-        </article>
-      </div>
-    </section>
+              ))}
+              {report.recommendations.manualActions.map((action) => (
+                <li key={action} className="rounded-xl border border-border/60 bg-secondary/40 px-4 py-3">
+                  {action}
+                </li>
+              ))}
+            </ul>
+          </article>
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-2">
+          <article className="rounded-2xl border border-border/70 bg-card/80 p-5">
+            <h3 className="text-base font-semibold tracking-tight">Lecture rapide</h3>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border border-border/70 bg-secondary/40 px-4 py-3">
+                <span className="block text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Sécurité</span>
+                <strong className="text-base font-semibold text-foreground">{report.vulnerabilities.status}</strong>
+              </div>
+              <div className="rounded-xl border border-border/70 bg-secondary/40 px-4 py-3">
+                <span className="block text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Renovate</span>
+                <strong className="text-base font-semibold text-foreground">{report.renovateExecution?.status ?? "non disponible"}</strong>
+              </div>
+              <div className="rounded-xl border border-border/70 bg-secondary/40 px-4 py-3">
+                <span className="block text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Décisions</span>
+                <strong className="text-base font-semibold text-foreground">{decisions.summary.totalActions}</strong>
+              </div>
+              <div className="rounded-xl border border-border/70 bg-secondary/40 px-4 py-3">
+                <span className="block text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Réponses Codex</span>
+                <strong className="text-base font-semibold text-foreground">{codex.summary.totalResponses}</strong>
+              </div>
+            </div>
+          </article>
+
+          <article className="rounded-2xl border border-border/70 bg-card/80 p-5">
+            <h3 className="text-base font-semibold tracking-tight">Réponses proposées par le système</h3>
+            <ul className="mt-4 space-y-3 text-sm leading-6 text-foreground">
+              {codex.responses.length === 0 ? (
+                <li className="rounded-xl border border-dashed border-border px-4 py-3 text-muted-foreground">
+                  Aucune réponse structurée disponible.
+                </li>
+              ) : (
+                codex.responses.map((response) => (
+                  <li key={response.actionId} className="rounded-xl border border-border/60 bg-secondary/40 px-4 py-3">
+                    <strong>{response.repository}</strong>
+                    {response.pullRequestNumber ? ` #${response.pullRequestNumber}` : ""} : {response.summary}
+                  </li>
+                ))
+              )}
+            </ul>
+          </article>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

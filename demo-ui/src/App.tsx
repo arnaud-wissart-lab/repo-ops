@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   buildSupervisorDecisions,
   buildSupervisorPrompts,
@@ -30,8 +30,6 @@ import type {
   PipelineStep,
   PipelineStepKey,
   PipelineStepState,
-  ResolvedTheme,
-  ThemePreference,
   UiStatus,
 } from "./types";
 import {
@@ -40,10 +38,17 @@ import {
   detectScenarioLabel,
   formatDuration,
   formatRelativeTime,
-  readStoredThemePreference,
-  resolveThemePreference,
-  writeStoredThemePreference,
 } from "./utils";
+import { Alert, AlertDescription, AlertTitle } from "./components/ui/alert";
+import { Badge } from "./components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardHeading,
+  CardTitle,
+} from "./components/ui/card";
 
 const configuredMode = getConfiguredDemoMode();
 
@@ -136,12 +141,6 @@ function statusTone(status: UiStatus): "neutral" | "done" | "warning" | "failed"
 }
 
 export default function App() {
-  const [themePreference, setThemePreference] = useState<ThemePreference>(() =>
-    readStoredThemePreference(),
-  );
-  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
-    resolveThemePreference(readStoredThemePreference()),
-  );
   const [status, setStatus] = useState<UiStatus>("idle");
   const [run, setRun] = useState<DemoRunState | null>(null);
   const [error, setError] = useState("");
@@ -151,34 +150,6 @@ export default function App() {
   const [deploymentStatus, setDeploymentStatus] = useState<UiStatus>("idle");
   const [deploymentResult, setDeploymentResult] = useState<DeploymentExecutionResult | null>(null);
   const [deploymentError, setDeploymentError] = useState("");
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-
-    const applyTheme = (prefersDark: boolean) => {
-      const nextTheme = resolveThemePreference(themePreference, prefersDark);
-      setResolvedTheme(nextTheme);
-      document.documentElement.dataset.theme = nextTheme;
-      document.documentElement.style.colorScheme = nextTheme;
-      writeStoredThemePreference(themePreference);
-    };
-
-    applyTheme(mediaQuery.matches);
-
-    const handleChange = (event: MediaQueryListEvent) => {
-      if (themePreference === "auto") {
-        applyTheme(event.matches);
-      }
-    };
-
-    if (typeof mediaQuery.addEventListener === "function") {
-      mediaQuery.addEventListener("change", handleChange);
-      return () => mediaQuery.removeEventListener("change", handleChange);
-    }
-
-    mediaQuery.addListener(handleChange);
-    return () => mediaQuery.removeListener(handleChange);
-  }, [themePreference]);
 
   function appendLog(entry: DeveloperLogEntry) {
     setLogs((current) => [...current, entry]);
@@ -451,15 +422,9 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <div className="ambient ambient-left" />
-      <div className="ambient ambient-right" />
-      <DemoModeBadge
-        themePreference={themePreference}
-        resolvedTheme={resolvedTheme}
-        onThemeChange={setThemePreference}
-      />
+      <DemoModeBadge />
 
-      <main className="layout">
+      <main className="mx-auto flex w-full max-w-[1480px] flex-col gap-6 px-4 pb-12 pt-2 sm:px-6 lg:px-8">
         <HeroSection
           mode={activeMode}
           status={status}
@@ -469,105 +434,137 @@ export default function App() {
           onDeploy={() => executeDeployment(configuredMode)}
         />
 
-        <section className="top-strip">
-          <div className="status-card">
-            <div>
-              <p className="section-kicker">État du run</p>
-              <h2>Statut d’exécution</h2>
-            </div>
-            <StatusPill
-              label={
-                status === "idle"
-                  ? "Prêt"
-                  : status === "loading"
-                    ? "Exécution"
-                    : status === "success"
-                      ? "Terminé"
-                      : "Erreur"
-              }
-              tone={statusTone(status)}
-            />
-            {error ? <p className="error-text">{error}</p> : null}
-            {report ? (
-              <div className="run-context-inline">
-                <p className="subtle-text">
-                  Dernière exécution : {formatRelativeTime(report.summary.runDateUtc)} · durée{" "}
-                  {formatDuration(report.observability?.durationMilliseconds)}
-                </p>
-                <p className="subtle-text">
-                  Mode : démonstration / dry-run · source {run?.source === "mock" ? "mock" : "API"}
-                </p>
-                <p className="run-scenario-text">Scénario : {scenarioLabel}</p>
-              </div>
-            ) : (
-              <div className="run-context-inline">
-                <p className="subtle-text">
-                  Cette application sert à suivre un cycle de maintenance, pas à administrer
-                  directement les dépôts.
-                </p>
-                <p className="subtle-text">
-                  Commencez par <strong>Charger un exemple</strong> pour comprendre les
-                  écrans, puis utilisez <strong>Lancer une analyse</strong> pour un run réel.
-                </p>
-              </div>
-            )}
-          </div>
+        <section className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)_minmax(320px,0.8fr)]">
+          <Card className="section-enter">
+            <CardHeader>
+              <CardHeading>
+                <div className="mb-2 flex items-center gap-2">
+                  <Badge variant="neutral">Contexte</Badge>
+                  <StatusPill
+                    label={
+                      status === "idle"
+                        ? "Prêt"
+                        : status === "loading"
+                          ? "Exécution"
+                          : status === "success"
+                            ? "Terminé"
+                            : "Erreur"
+                    }
+                    tone={statusTone(status)}
+                  />
+                </div>
+                <CardTitle>Lecture de la démo</CardTitle>
+                <CardDescription>
+                  Un run complet de maintenance logicielle, depuis les signaux GitHub jusqu’à la synthèse exploitable.
+                </CardDescription>
+              </CardHeading>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
+              {report ? (
+                <>
+                  <p>
+                    Dernière exécution : <strong className="text-foreground">{formatRelativeTime(report.summary.runDateUtc)}</strong> · durée{" "}
+                    <strong className="text-foreground">{formatDuration(report.observability?.durationMilliseconds)}</strong>
+                  </p>
+                  <p>
+                    Mode : <strong className="text-foreground">démonstration / dry-run</strong> · source{" "}
+                    <strong className="text-foreground">{run?.source === "mock" ? "mock" : "API"}</strong>
+                  </p>
+                  <p>
+                    Scénario : <strong className="text-foreground">{scenarioLabel}</strong>
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p>
+                    Cette application sert à suivre et expliquer un cycle de maintenance, pas à administrer directement des dépôts.
+                  </p>
+                  <p>
+                    Commencez par <strong className="text-foreground">Charger un exemple</strong>, puis testez{" "}
+                    <strong className="text-foreground">Lancer une analyse réelle</strong> si le worker est disponible.
+                  </p>
+                </>
+              )}
+              {error ? (
+                <Alert variant="danger">
+                  <div>
+                    <AlertTitle>Exécution interrompue</AlertTitle>
+                    <AlertDescription>{error}</AlertDescription>
+                  </div>
+                </Alert>
+              ) : null}
+            </CardContent>
+          </Card>
 
-          <div className="status-card">
-            <div>
-              <p className="section-kicker">Déploiement local</p>
-              <h2>Bouton de déploiement</h2>
-            </div>
-            <StatusPill
-              label={
-                deploymentStatus === "idle"
-                  ? "Non déclenché"
-                  : deploymentStatus === "loading"
-                    ? "Déploiement"
-                    : deploymentStatus === "success"
-                      ? deploymentResult?.dryRunEnabled
-                        ? "Dry-run exécuté"
-                        : "Déployé"
-                      : "Échec"
-              }
-              tone={statusTone(deploymentStatus)}
-            />
-            {deploymentResult ? (
-              <div className="run-context-inline">
-                <p className="subtle-text">{deploymentResult.summary}</p>
-                <p className="subtle-text">
-                  Cible : {deploymentResult.targetName} · durée{" "}
-                  {deploymentResult.durationSeconds?.toFixed(1) ?? "0.0"} s
+          <Card className="section-enter">
+            <CardHeader>
+              <CardHeading>
+                <Badge variant="info">Déploiement local</Badge>
+                <CardTitle>Bouton de déploiement</CardTitle>
+                <CardDescription>
+                  Workflow manuel prévu pour votre machine personnelle, avec vérification finale.
+                </CardDescription>
+              </CardHeading>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
+              <StatusPill
+                label={
+                  deploymentStatus === "idle"
+                    ? "Non déclenché"
+                    : deploymentStatus === "loading"
+                      ? "Déploiement"
+                      : deploymentStatus === "success"
+                        ? deploymentResult?.dryRunEnabled
+                          ? "Dry-run exécuté"
+                          : "Déployé"
+                        : "Échec"
+                }
+                tone={statusTone(deploymentStatus)}
+              />
+              {deploymentResult ? (
+                <>
+                  <p>{deploymentResult.summary}</p>
+                  <p>
+                    Cible : <strong className="text-foreground">{deploymentResult.targetName}</strong> · durée{" "}
+                    <strong className="text-foreground">{deploymentResult.durationSeconds?.toFixed(1) ?? "0.0"} s</strong>
+                  </p>
+                  <p>Vérification : <strong className="text-foreground">{deploymentResult.verificationMessage}</strong></p>
+                  <p className="break-all">Commande : {deploymentResult.command}</p>
+                </>
+              ) : deploymentError ? (
+                <Alert variant="danger">
+                  <div>
+                    <AlertTitle>Déploiement interrompu</AlertTitle>
+                    <AlertDescription>{deploymentError}</AlertDescription>
+                  </div>
+                </Alert>
+              ) : (
+                <p>
+                  Déclenche un déploiement local explicite de ce dépôt sur la machine hôte, avec contrôle final de{" "}
+                  <strong className="text-foreground">https://repoops.arnaudwissart.fr</strong>.
                 </p>
-                <p className="run-scenario-text">
-                  Vérification : {deploymentResult.verificationMessage}
-                </p>
-                <p className="subtle-text">
-                  Commande : {deploymentResult.command}
-                </p>
-              </div>
-            ) : deploymentError ? (
-              <p className="error-text">{deploymentError}</p>
-            ) : (
-              <p className="subtle-text">
-                Déclenche un déploiement local explicite de ce dépôt sur la
-                machine hôte, avec contrôle final de
-                {" "}https://repoops.arnaudwissart.fr.
-              </p>
-            )}
-          </div>
+              )}
+            </CardContent>
+          </Card>
 
-          <div className="status-card">
-            <div>
-              <p className="section-kicker">Sécurité</p>
-              <h2>Cadre de démonstration</h2>
-            </div>
-            <ul className="detail-list">
-              <li>Dry-run conservé sur les mécanismes sensibles.</li>
-              <li>Aucune opération Git réelle depuis l’interface.</li>
-              <li>La validation humaine reste hors de portée de la page.</li>
-            </ul>
-          </div>
+          <Card className="section-enter">
+            <CardHeader>
+              <CardHeading>
+                <Badge variant="success">Sécurité</Badge>
+                <CardTitle>Cadre de démonstration</CardTitle>
+                <CardDescription>
+                  La page reste démonstrative même lorsqu’elle appelle le backend local.
+                </CardDescription>
+              </CardHeading>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-3 text-sm leading-6 text-muted-foreground">
+                <li>Dry-run conservé sur les mécanismes sensibles.</li>
+                <li>Aucune opération Git réelle depuis l’interface.</li>
+                <li>La validation humaine reste hors de portée de la page.</li>
+              </ul>
+            </CardContent>
+          </Card>
         </section>
 
         {report ? <GlobalStatusBanner report={report} /> : null}
@@ -578,8 +575,6 @@ export default function App() {
           <EmptyStatePanel />
         )}
 
-        <PipelineVisualizer steps={toPipelineSteps(pipelineStates)} />
-
         <KpiGrid
           analyzedPullRequests={analyzedPullRequests}
           readyPullRequests={readyPullRequests}
@@ -588,30 +583,36 @@ export default function App() {
           proposedActions={proposedActions}
         />
 
-        <div className="content-grid">
-          <div className="content-column">
+        <div className="grid gap-6 xl:grid-cols-[minmax(340px,0.92fr)_minmax(0,1.08fr)]">
+          <PipelineVisualizer steps={toPipelineSteps(pipelineStates)} />
+          {report && decisions && codex ? (
+            <RunSummary report={report} decisions={decisions} codex={codex} />
+          ) : (
+            <Card className="section-enter">
+              <CardHeader>
+                <CardHeading>
+                  <Badge variant="neutral">Synthèse</Badge>
+                  <CardTitle>Résumé exécutif du run</CardTitle>
+                  <CardDescription>
+                    La synthèse consolidée apparaîtra ici après le premier scénario.
+                  </CardDescription>
+                </CardHeading>
+              </CardHeader>
+              <CardContent className="text-sm leading-6 text-muted-foreground">
+                Lancez une analyse ou chargez un exemple pour afficher la synthèse consolidée,
+                les messages importants et les réponses proposées.
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)]">
+          <div className="space-y-6">
             <DecisionSection actions={decisions?.actions ?? []} />
-            {report && decisions && codex ? (
-              <RunSummary report={report} decisions={decisions} codex={codex} />
-            ) : (
-              <section className="panel panel-reveal">
-                <div className="panel-header">
-                  <div>
-                    <p className="section-kicker">Synthèse</p>
-                    <h2>Résumé exécutif du run</h2>
-                  </div>
-                </div>
-                <p className="empty-state">
-                  Lancez une analyse ou chargez un exemple pour afficher la
-                  synthèse consolidée, les messages importants et les réponses
-                  proposées, ainsi que la narration du run.
-                </p>
-              </section>
-            )}
+            <PromptSection prompts={prompts?.prompts ?? []} />
           </div>
 
-          <div className="content-column">
-            <PromptSection prompts={prompts?.prompts ?? []} />
+          <div className="space-y-6">
             <DeveloperPanel logs={logs} run={run} />
           </div>
         </div>

@@ -1,6 +1,18 @@
 import { useEffect, useRef, useState } from "react";
+import { Braces, ClipboardCopy, Logs } from "lucide-react";
 import type { DeveloperLogEntry, DemoRunState } from "../types";
 import { formatDateTime, toPrettyJson } from "../utils";
+import { Badge } from "./ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardHeading,
+  CardTitle,
+} from "./ui/card";
+import { Button } from "./ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 
 interface DeveloperPanelProps {
   logs: DeveloperLogEntry[];
@@ -36,85 +48,110 @@ export function DeveloperPanel({ logs, run }: DeveloperPanelProps) {
   }
 
   return (
-    <section className="panel developer-panel panel-reveal">
-      <div className="panel-header">
-        <div>
-          <p className="section-kicker">Panneau développeur</p>
-          <h2>Sortie technique (mode développeur)</h2>
-          <p className="subtle-text">
-            Logs structurés et JSON brut prêts pour inspection, copie et
-            démonstration technique.
-          </p>
-        </div>
-        <div className="tab-bar">
-          <button
-            type="button"
-            className={activeTab === "logs" ? "tab-button is-active" : "tab-button"}
-            onClick={() => setActiveTab("logs")}
-          >
-            Logs
-          </button>
-          <button
-            type="button"
-            className={activeTab === "json" ? "tab-button is-active" : "tab-button"}
-            onClick={() => setActiveTab("json")}
-          >
-            JSON brut
-          </button>
-        </div>
-      </div>
+    <Card className="section-enter">
+      <CardHeader>
+        <CardHeading>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <Badge variant="neutral">Mode développeur</Badge>
+            <Badge variant="info">Inspection technique</Badge>
+          </div>
+          <CardTitle>Sortie technique (mode développeur)</CardTitle>
+          <CardDescription>
+            Logs structurés et JSON brut prêts pour inspection, copie et démonstration technique.
+          </CardDescription>
+        </CardHeading>
+      </CardHeader>
+      <CardContent>
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabKey)}>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <TabsList>
+              <TabsTrigger value="logs">
+                <Logs className="size-4" />
+                Logs
+              </TabsTrigger>
+              <TabsTrigger value="json">
+                <Braces className="size-4" />
+                JSON brut
+              </TabsTrigger>
+            </TabsList>
 
-      {activeTab === "logs" ? (
-        <>
-          <div className="developer-toolbar">
-            <span className="developer-toolbar-label">Trace d’exécution</span>
-            <label className="toggle-option">
-              <input
-                type="checkbox"
-                checked={autoScroll}
-                onChange={(event) => setAutoScroll(event.target.checked)}
-              />
-              <span>Auto-scroll</span>
-            </label>
+            {activeTab === "logs" ? (
+              <label className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={autoScroll}
+                  onChange={(event) => setAutoScroll(event.target.checked)}
+                />
+                Auto-scroll
+              </label>
+            ) : (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => void copyJson()}
+                disabled={!run}
+              >
+                <ClipboardCopy className="size-4" />
+                {copied ? "JSON copié" : "Copier le JSON"}
+              </Button>
+            )}
           </div>
-          <div ref={consoleRef} className="developer-console">
-          {logs.length === 0 ? (
-            <p className="empty-state">Aucun log disponible pour l’instant.</p>
-          ) : (
-            logs.map((log, index) => (
-              <div key={`${log.timestamp}-${index}`} className={`log-line log-${log.level.toLowerCase()}`}>
-                <span className="log-time">{formatDateTime(log.timestamp)}</span>
-                <span className="log-level">{log.level}</span>
-                <span className="log-source">{log.source}</span>
-                <span className="log-message">{log.message}</span>
-              </div>
-            ))
-          )}
-          </div>
-        </>
-      ) : (
-        <div className="json-panel">
-          <div className="json-toolbar">
-            <span>Sortie technique brute</span>
-            <button
-              type="button"
-              className="secondary-button json-copy-button"
-              onClick={() => void copyJson()}
-              disabled={!run}
-            >
-              {copied ? "JSON copié" : "Copier le JSON"}
-            </button>
-          </div>
-          <div className="json-editor">
-            <div className="json-editor-gutter">
-              {jsonLines.map((_, index) => (
-                <span key={`line-${index + 1}`}>{index + 1}</span>
-              ))}
+
+          <TabsContent value="logs">
+            <div className="mb-3 flex items-center justify-between gap-3 text-sm">
+              <span className="font-medium text-foreground">Trace d’exécution</span>
+              <span className="text-muted-foreground">{logs.length} entrée(s)</span>
             </div>
-            <pre className="json-editor-content">{jsonContent}</pre>
-          </div>
-        </div>
-      )}
-    </section>
+            <div ref={consoleRef} className="code-surface max-h-[34rem] overflow-auto p-4">
+              {logs.length === 0 ? (
+                <p className="text-sm text-slate-400">Aucun log disponible pour l’instant.</p>
+              ) : (
+                <div className="space-y-2 font-mono text-[13px]">
+                  {logs.map((log, index) => (
+                    <div
+                      key={`${log.timestamp}-${index}`}
+                      className="grid gap-2 rounded-lg border border-slate-800/70 bg-slate-950/70 px-3 py-2 md:grid-cols-[168px_72px_96px_minmax(0,1fr)]"
+                    >
+                      <span className="text-slate-400">{formatDateTime(log.timestamp)}</span>
+                      <span
+                        className={
+                          log.level === "ERROR"
+                            ? "font-semibold text-rose-300"
+                            : log.level === "WARN"
+                              ? "font-semibold text-amber-300"
+                              : "font-semibold text-emerald-300"
+                        }
+                      >
+                        {log.level}
+                      </span>
+                      <span className="text-sky-300">{log.source}</span>
+                      <span className="break-words text-slate-100">{log.message}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="json">
+            <div className="mb-3 flex items-center justify-between gap-3 text-sm">
+              <span className="font-medium text-foreground">Sortie technique brute</span>
+              <span className="text-muted-foreground">JSON formaté et copiable</span>
+            </div>
+            <div className="code-surface grid max-h-[34rem] grid-cols-[56px_minmax(0,1fr)] overflow-hidden">
+              <div className="overflow-hidden border-r border-slate-800/80 bg-slate-900/80 px-3 py-4 text-right font-mono text-xs text-slate-500">
+                {jsonLines.map((_, index) => (
+                  <div key={`line-${index + 1}`} className="leading-6">
+                    {index + 1}
+                  </div>
+                ))}
+              </div>
+              <pre className="overflow-auto p-4 font-mono text-[13px] leading-6 text-slate-100">{jsonContent}</pre>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+    </Card>
   );
 }

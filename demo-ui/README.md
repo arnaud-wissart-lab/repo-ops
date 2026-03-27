@@ -1,6 +1,6 @@
 # Démo web repo-ops
 
-Cette interface fournit une démonstration visuelle du pipeline `repo-ops` dans un format lisible, moderne et sûr. Elle est pensée pour montrer le fonctionnement du système à un recruteur, un tech lead ou un lecteur technique sans exposer d’action dangereuse.
+Cette interface fournit une démonstration visuelle du pipeline `repo-ops` dans un format lisible, professionnel et sûr. Elle s’appuie désormais sur une base visuelle inspirée de Metronic, avec un thème clair par défaut, un sélecteur de thème et une hiérarchie de cartes plus proche d’un produit de supervision technique que d’un simple dashboard custom.
 
 ## Ce que montre la page
 
@@ -14,7 +14,8 @@ Cette interface fournit une démonstration visuelle du pipeline `repo-ops` dans 
 - affichage des prompts générés ;
 - déclenchement d’un déploiement local explicite via le worker ;
 - affichage d’un panneau développeur avec logs et JSON brut ;
-- chargement d’un scénario mock réaliste si le backend n’est pas disponible.
+- chargement d’un scénario mock réaliste si le backend n’est pas disponible ;
+- sélecteur de thème `Clair / Sombre / Auto`.
 
 La page n’exécute pas :
 
@@ -39,7 +40,9 @@ En environnement déployé, la démo est maintenant servie par un conteneur Ngin
 - [`src/api.ts`](./src/api.ts) : appels HTTP et gestion du timeout ;
 - [`src/mocks/demoData.ts`](./src/mocks/demoData.ts) : scénario mock réaliste ;
 - [`src/components`](./src/components) : composants de présentation ;
-- [`src/styles.css`](./src/styles.css) : thème cockpit technique premium.
+- [`src/components/ui`](./src/components/ui) : primitives visuelles de base inspirées de Metronic ;
+- [`src/lib/utils.ts`](./src/lib/utils.ts) : helper de fusion de classes Tailwind ;
+- [`src/styles.css`](./src/styles.css) : fondations visuelles Tailwind/Metronic, tokens et thème global.
 
 ## Prérequis
 
@@ -73,6 +76,13 @@ npm run dev
 ```text
 http://127.0.0.1:5173
 ```
+
+## Parcours conseillé
+
+1. Cliquer sur `Charger un exemple` pour afficher immédiatement un run complet et comprendre le rôle de l’application.
+2. Relire le bloc `Ce que le système a fait`, puis le pipeline et les décisions.
+3. Utiliser ensuite `Lancer une analyse réelle` si le worker local est disponible.
+4. Consulter enfin `Sortie technique (mode développeur)` pour les logs et le JSON.
 
 ## Configuration de l’URL API
 
@@ -128,9 +138,10 @@ npm run build
 
 ## Intentions UX/UI
 
+- base visuelle inspirée de Metronic, plus sobre et plus standardisée ;
 - hiérarchie visuelle forte avec un hero clair ;
 - badge de démonstration visible en permanence ;
-- sélecteur de thème `Clair / Sombre / Auto` pour éviter d’imposer une lecture trop contrastée ;
+- sélecteur de thème `Clair / Sombre / Auto` pour éviter d’imposer un rendu sombre ;
 - lecture narrative immédiate après le run ;
 - contexte de scénario et de durée visible sans ouvrir les détails ;
 - lecture rapide des KPI principaux ;

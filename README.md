@@ -615,6 +615,8 @@ docker compose --profile maintenance run --rm renovate --version
 
 4. Accéder à `n8n` via l’URL exposée par `N8N_EDITOR_BASE_URL`, puis créer le compte propriétaire initial demandé par l’interface.
 
+   La variable facultative `N8N_IMAGE` permet de sélectionner une image n8n préalablement validée, notamment pour appliquer un correctif Node sans migrer l'application. La valeur du fichier `.env` est également respectée par le script de déploiement manuel. Sans cette variable, l'image officielle de la branche 1 reste utilisée. Une image locale doit être construite sur la machine cible avant le déploiement.
+
 5. Importer le workflow versionné dans `n8n`.
 
 6. Dans le workflow importé, remplacer les marqueurs `__CONFIGURER_FROM_DANS_N8N__` et `__CONFIGURER_TO_DANS_N8N__`, puis associer le credential SMTP.

@@ -116,7 +116,7 @@ services:
       - repo-ops
 
   n8n:
-    image: docker.n8n.io/n8nio/n8n:1
+    image: ${N8N_IMAGE:-docker.n8n.io/n8nio/n8n:1}
     restart: unless-stopped
     environment:
       TZ: ${TZ}

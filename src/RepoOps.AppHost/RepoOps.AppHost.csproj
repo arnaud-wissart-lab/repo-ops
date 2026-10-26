@@ -12,4 +12,8 @@
     <ProjectReference Include="..\RepoOps.Worker\RepoOps.Worker.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Version corrigée imposée pour supprimer une dépendance vulnérable détectée par NuGet. -->
+    <PackageReference Include="MessagePack" Version="2.5.303" />
+  </ItemGroup>
 </Project>

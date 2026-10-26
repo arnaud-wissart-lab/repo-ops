@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.403 AS build
 WORKDIR /src
 
 COPY ["src/RepoOps.Worker/RepoOps.Worker.csproj", "src/RepoOps.Worker/"]
@@ -8,7 +8,7 @@ COPY . .
 WORKDIR /src/src/RepoOps.Worker
 RUN dotnet publish "RepoOps.Worker.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.14 AS final
 WORKDIR /app
 COPY --from=build /app/publish .
 
